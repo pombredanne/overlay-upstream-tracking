@@ -1,0 +1,60 @@
+overlay-upstream-tracking: A tool for gentoo overlay maintenance
+
+Copyright (C) 2013 Greogry M. Turner
+
+This software may be used and resdistributed under the terms
+of the GPL v2.  See COPYING for the gory details.
+
+If you maintain some Gentoo overlays you have probably noticed
+that although an overlay is easy to create, it's a royal pain
+in the ass to maintian.  This is because, by and large, no
+provision is made in the overlay system to account for the
+reality that upstream source code is often rapidly changing,
+as may also be the code in the overlay, creating a frequent
+need to merge upstream changes into downstream overlay code.
+
+overlay-upstream-tracking is a simple framework to allow
+Gentoo overlay maintainers to specify the realtionship
+between code in the overlay and upstream code, and
+to have the corresponding subset of the upstream repository
+automatically generated and updated in a format convienient
+for tracking and merging upstream changes into the overlay.
+
+It also provides additional plumbing to set up and maintian
+these merging relationships in git repostiories.
+
+The presumptive arrangment of information flows is thus
+(ascii art here -- monospace font required)
+
++->[ upstream ]
+|    |
+|    v
+|  [ upstream-tracking pseudo-overlay ]
+|    |
+|    v
+| [ overlay ] 
+|    |
+|    v
++-[[ for-upstream overlays ]]
+
+The upstream-tracking pseudo-overlay contains information from
+upstream, but that information is consolidated into a format
+convenient for consumption by the overlay maintainer.  Mostly,
+this consolidation consists of omission and inclusion of
+various files according to various standardized or user-specified
+naming conventions, and renaming of those files to match the
+names of files in the overlay.
+
+The for-upstream overlays (there may be several) are intended as
+a place to export deltas from the overlay in a format suitable for
+easy consumption by the upstream maintainer.
+
+All of these repositories are by default treated by
+overlay-upstream-tracking as versionless piles of files.
+However, the intention is that someone or something will
+version control the upstream-tracking overlay and then
+merge the differences from there into the overlay.
+
+This process is automated by the pull-upstream-tracking script
+which also supports optional automatic maintenance of a
+corresponding vcs repository (currently, only git).
