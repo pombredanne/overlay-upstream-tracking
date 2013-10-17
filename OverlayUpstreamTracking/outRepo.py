@@ -5,6 +5,6 @@ class outRepo:
 	def __init__(self, overlaydir=''):
 		if overlaydir == '':
 			overlaydir=getcwd()
-		self.overlayRepo=Repo(overlaydir)
-	def repo(self):
+		self.overlayRepo=Repo(overlaydir, odbt=GitCmdObjectDB)
+	def getOverlayRepo(self):
 		return self.overlayRepo
