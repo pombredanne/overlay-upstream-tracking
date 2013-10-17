@@ -11,5 +11,5 @@ setup(name='overlay-upstream-tracking',
       packages=['overlay-upstream-tracking'],
       url='http://fixme/',
       scripts=['scripts/pull-upstream-tracking'],
-      requires=['git-python (>=0.3.1)'],
+      requires=['GitPython (>=0.3.1)'],
       )
