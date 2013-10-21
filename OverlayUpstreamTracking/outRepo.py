@@ -1,7 +1,10 @@
 from dulwich.repo import Repo
 from dulwich.errors import NotGitRepository
-from os import getcwd
+from os import getcwd, F_OK, R_OK, X_OK, W_OK
 from os.path import isdir, islink, dirname
+import os
+from stat import S_ISDIR, S_ISREG
+from errno import EACCES, EPERM, ENOENT
 
 class InvalidOverlayRepositoryError(Exception):
 	"""Thrown if a valid git repository is specified but it does not contain a profiles/repo_name file"""
@@ -11,6 +14,9 @@ class NoSuchPathError(Exception):
 
 class NotARepository(Exception):
 	"""Thrown by outRepo() when the provided repostiroy directory is not a repository of the specified type"""
+
+class RepositoryPermissionsError(InvalidOverlayRepositoryError):
+	"""Thrown when a requested operation cannot complete due to file permissions trouble"""
 
 class VCS(object):
 	"""Abstract VCS support class"""
@@ -51,6 +57,12 @@ class gitVCS(VCS):
 					raise NotARepository("Not a Git Repository: %s" % origoverlaydir)
 				pass
 
+		# bare repositories don't provide the regular-filessytem stuff on which we rely.
+		# perhaps this could be supported by abstracting all filesystem operations through
+		# the vcs; however, this sounds like a pain in the ass to implement!
+		if not self._gitrepo.has_index():
+			raise InvalidOverlayRepositoryError("Bare repository '%s' not supported" % self._gitrepo.path)
+
 	def get_overlay_root(self):
 		return self._gitrepo.path
 
@@ -88,12 +100,84 @@ class outRepo(object):
 		self._vcs = vcstype(self, overlaydir)
 		self._verify_overlay()
 
-	def _verify_overlay(self):
-		# hc = repo.head.commit
-		# if (!hc)
-		# 	raise InvalidOverlayRepositoryError("Headless repository probably contains no commits")
-		# hct = hc.tree
+	def _check_path_isdir(self, path):
+		"""Check for a readable, traverseable directory -- not a symlink or a subdirectory of
+		a symlink -- at the specified path relative to overlay_root.  This is only for sanity-checking,
+		not security boundary enforcement purposes!
+
+		:return: True if a relative path exists under overlay_root, is a directory, and is not
+		a symlink, and all parent directories also meet this criterion, up to overlay_root itself.
+		Preceeding and trailing path separators are stripped."""
+		while len(path) > 0 and path[0] == os.sep:
+			path=path[1::]
+		while len(path) > 0 and path[-1] == os.sep:
+			path=path[:-1]
+		testpath = self.overlay_root
+
+		# recursively check all the parents first.  Then append path to testpath and
+		# proceed with the outermost check.
+		if len(path) > 0:
+			if not self._check_path_isdir(dirname(path)):
+				return False
+			testpath = os.path.join(testpath, path)
+
+		# the actual checking, translating errors we "support" into framework exceptions
+		try:
+			st = os.lstat(testpath)
+		except OSError as e:
+			if e.errno == ENOENT:
+				raise NoSuchPathError("stat('%s') -> ENOENT: %s" % (testpath, e))
+			if e.errno == EACCES:
+				raise RepositoryPermissionsError("stat('%s') -> EACCES: %s" % (testpath, e))
+			if e.errno == EPERM:
+				raise RepositoryPermissionsError("stat('%s') -> EPERM: %s" % (testpath, e))
+			else:
+				raise e
+
+		if not os.access(testpath, R_OK|X_OK):
+			raise RepositoryPermissionsError("os.access('%s',R_OK|X_OK): False" % (testpath))
+
+		m = st.st_mode
+		if not S_ISDIR(m):
+			# it exists but is not a directory.  It's probably a link.
+			return False
+
 		return True
+
+	def _check_path_isreg(self, path):
+		""":return: True iff the provided (relative) path is a regular file under overlay_root"""
+		while len(path) > 0 and path[0] == os.sep:
+			path=path[1::]
+
+		testpath = self.overlay_root
+		if len(testpath) > 0:
+			testpath = os.path.join(testpath, path)
+		try:
+			st = os.lstat(testpath)
+		except OSError as e:
+			if e.errno == ENOENT:
+				raise NoSuchPathError("stat('%s') -> ENOENT: %s" % (testpath, e))
+			if e.errno == EACCES:
+				raise RepositoryPermissionsError("stat('%s') -> EACCES: %s" % (testpath, e))
+			if e.errno == EPERM:
+				raise RepositoryPermissionsError("stat('%s') -> EPERM: %s" % (testpath, e))
+			else:
+				raise e
+		if not os.access(testpath, R_OK):
+			raise RepositoryPermissionsError("os.access('%s',R_OK|X_OK): False" % (testpath))
+		m = st.st_mode
+		if not S_ISREG(m):
+			# exists but is not a regular file: perhaps it's a link.
+			return False
+		return True
+
+	def _verify_overlay(self):
+		# sanity check the overlay: we expect at least profile/repo_name to exist or else
+		# we consider it a lost cause
+		if not self._check_path_isdir('profiles'):
+			raise InvalidOverlayRepositoryError("'profiles' seems to exist but is not a directory in '%s'" % self.overlay_root)
+		if not self._check_path_isreg('profiles/repo_name'):
+			raise InvalidOverlayRepositoryError("'profiles/repo_name' seems to exist but is not a regular file in '%s'" % self.overlay_root)
 
 	@property
 	def vcs(self):
