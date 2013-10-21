@@ -1,10 +1,13 @@
-from git import Repo,GitCmdObjectDB
-from git.exc import NoSuchPathError, InvalidGitRepositoryError
+from dulwich.repo import Repo
+from dulwich.errors import NotGitRepository
 from os import getcwd
-from os.path import isdir, islink
+from os.path import isdir, islink, dirname
 
 class InvalidOverlayRepositoryError(Exception):
 	"""Thrown if a valid git repository is specified but it does not contain a profiles/repo_name file"""
+
+class NoSuchPathError(Exception):
+	"""Thrown if an attempt is made to create an outRepo corresponding to a non-existent path"""
 
 class outRepo(object):
 	"""Represents an overlay-upstream-tracking-enabled overlay, presumptively
@@ -13,11 +16,12 @@ class outRepo(object):
 	def __init__(self, overlaydir=None):
 		"""Create a new outRepo instance
 
-		:param overlaydir: a path or git-url which contains or is contained by
-		a git repository containing a Gentoo overlay.  If not provided, the
-		current working directory will be used as a default.
+		:param overlaydir: a path within a Gentoo overlay under git version-control.
+		If not provided, the current working directory will be used as a default.
+		outrepo will automatically determine the root directory of any git repository,
+		much as the git command-line would do.
 
-		:raise InvalidGitRepositoryError:
+		:raise dulwich.errors.NotGitRepository:
 		:raise NoSuchPathError:
 		:raise InvalidOverlayRepositoryError:
 		:return: OverlayUpstreamTracking.outRepo"""
@@ -30,30 +34,37 @@ class outRepo(object):
 			if islink(overlaydir) or (not isdir(overlaydir)):
 				raise NoSuchPathError(overlaydir)
 
-		self.repo=Repo(overlaydir, odbt=GitCmdObjectDB)
+		self.repo = None
+		while not self.repo:
+			try:
+				self.repo = Repo(overlaydir)
+			except NotGitRepository:
+				oldoverlaydir = overlaydir
+				overlaydir = dirname(overlaydir)
+				if oldoverlaydir == overlaydir:
+					raise
+				pass
 		self._verify_overlay()
 
 	def _verify_overlay(self):
-		hc = repo.head.commit
-		if (!hc)
-			raise InvalidOverlayRepositoryError("Headless repository probably contains no commits")
-		hct = hc.tree
+		# hc = repo.head.commit
+		# if (!hc)
+		# 	raise InvalidOverlayRepositoryError("Headless repository probably contains no commits")
+		# hct = hc.tree
+		return True
 
 	@property
 	def overlay_repo_dir(self):
 		""":return: The directory of the targeted overlay repository"""
-		return self.repo.working_dir
+		return self.repo.path
 
 	def __eq__(self, rhs):
 		if isinstance(rhs, outRepo):
-			return self.repo.git_dir == rhs.repo.git_dir
+			return self.overlay_repo_dir == rhs.overlay_repo_dir
 		return False
 
 	def __ne__(self, rhs):
 		return not self.__eq__(rhs)
 
-	def __hash__(self):
-		return self.repo.hash()
-
 	def __repr__(self):
-		return '<OverlayUpstreamTracking.outRepo "%s">' % self.repo.git_dir
+		return '<OverlayUpstreamTracking.outRepo "%s">' % self.overlay_repo_dir

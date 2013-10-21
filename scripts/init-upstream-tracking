@@ -2,8 +2,8 @@
 
 import argparse
 
-from git.exc import InvalidGitRepositoryError, NoSuchPathError
-from OverlayUpstreamTracking.outRepo import outRepo
+from dulwich.errors import NotGitRepository
+from OverlayUpstreamTracking.outRepo import outRepo, NoSuchPathError
 from os import getcwd
 from sys import exit, stderr
 
@@ -15,7 +15,7 @@ args = vars(parser.parse_args())
 
 try:
 	theOR = outRepo(args['overlaydir'])
-except (InvalidGitRepositoryError, NoSuchPathError):
+except (NotGitRepository, NoSuchPathError):
 	if args['overlaydir'] == None:
 		stderr.write('The current working directory "' + getcwd() + '" does not\n')
 		stderr.write('appear to belong to a git repository.  Either change it\n')
