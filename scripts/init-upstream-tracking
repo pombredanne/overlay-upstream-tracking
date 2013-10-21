@@ -15,18 +15,17 @@ args = vars(parser.parse_args())
 
 try:
 	theOR = outRepo(args['overlaydir'])
-except (NotGitRepository, NoSuchPathError):
+except (NotARepository, NoSuchPathError, InvalidOverlayRepositoryError) as e:
 	if args['overlaydir'] == None:
 		stderr.write('The current working directory "' + getcwd() + '" does not\n')
-		stderr.write('appear to belong to a git repository.  Either change it\n')
+		stderr.write('appear to belong to a valid git overlay.  Either change it\n')
 		stderr.write('so that it does, or supply one with the --overlay argument.\n')
 	else:
 		stderr.write('The requested location "' + args['overlaydir'] + '" does not\n')
-		stderr.write('appear to contain a git repository.  Unable to proceed.\n')
-
+		stderr.write('appear to contain a valid git overlay.  Unable to proceed.\n')
 	stderr.write('\n')
 	parser.print_help()
 	stderr.write('\n')
-	exit('Valid git repository not specified or detected.')
+	exit('Valid git repository not specified or detected: %s' % e)
 
 print('Overlay Directory == "' + theOR.overlay_root + '"')
