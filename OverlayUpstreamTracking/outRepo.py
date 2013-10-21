@@ -9,19 +9,68 @@ class InvalidOverlayRepositoryError(Exception):
 class NoSuchPathError(Exception):
 	"""Thrown if an attempt is made to create an outRepo corresponding to a non-existent path"""
 
+class NotARepository(Exception):
+	"""Thrown by outRepo() when the provided repostiroy directory is not a repository of the specified type"""
+
+class VCS(object):
+	"""Abstract VCS support class"""
+	def __init__(self, outrepo):
+		"""Create VCS instance; outrepo is the parent outRepo to which this outVCS belongs.
+		This is an abstract class by design -- it is the obligation of the subclass to
+		call this inhertied __init__ and additionally to process a third argument to __init__,
+		the overlay directory for the VCS repository instance, which, in the subclass constructor,
+		must be used to initialize the repository object.
+
+		:param outrepo: The outRepo instance to which this VCS instance will be forever married."""
+		self.repo = outrepo
+		outrepo.vcs = self
+
+	@property
+	def overlay_root(self):
+		# indirection hack supports polymorphic getter in superclass:
+		# http://stackoverflow.com/questions/3393534
+		return self.get_overlay_root()
+
+	def get_overlay_root(self):
+		raise NotImplementedError('VCS.get_overlay_root called directly')
+
+class gitVCS(VCS):
+	"""Git implementation of the VCS interface"""
+	def __init__(self, outrepo, overlaydir):
+		super(gitVCS, self).__init__(outrepo)
+		self._gitrepo = None
+		origoverlaydir = overlaydir
+		while not self._gitrepo:
+			try:
+				self._gitrepo = Repo(overlaydir)
+			except NotGitRepository as e:
+				oldoverlaydir = overlaydir
+				overlaydir = dirname(overlaydir)
+				if oldoverlaydir == overlaydir:
+					# apparently the original overlaydir argument was not a git repo dir
+					raise NotARepository("Not a Git Repository: %s" % origoverlaydir)
+				pass
+
+	def get_overlay_root(self):
+		return self._gitrepo.path
+
 class outRepo(object):
 	"""Represents an overlay-upstream-tracking-enabled overlay, presumptively
 	under control by git"""
 
-	def __init__(self, overlaydir=None):
+	def __init__(self, overlaydir=None, vcstype=gitVCS):
 		"""Create a new outRepo instance
 
 		:param overlaydir: a path within a Gentoo overlay under git version-control.
 		If not provided, the current working directory will be used as a default.
-		outrepo will automatically determine the root directory of any git repository,
+		outrepo will automatically determine the root directory of the VCS repository,
 		much as the git command-line would do.
 
-		:raise dulwich.errors.NotGitRepository:
+		:param vcstype: The VCS type to instantiate.  Currently, only gitVCS is implemented
+		but hypothetically, any subclass implementing the OverlayUpstreamTracking.VCS interface
+		could be used.
+
+		:raise NotARepository:
 		:raise NoSuchPathError:
 		:raise InvalidOverlayRepositoryError:
 		:return: OverlayUpstreamTracking.outRepo"""
@@ -34,16 +83,9 @@ class outRepo(object):
 			if islink(overlaydir) or (not isdir(overlaydir)):
 				raise NoSuchPathError(overlaydir)
 
-		self.repo = None
-		while not self.repo:
-			try:
-				self.repo = Repo(overlaydir)
-			except NotGitRepository:
-				oldoverlaydir = overlaydir
-				overlaydir = dirname(overlaydir)
-				if oldoverlaydir == overlaydir:
-					raise
-				pass
+		# not strictly needed but for clarity: the one-off setter sort-of relies on this
+		self._vcs = None
+		self._vcs = vcstype(self, overlaydir)
 		self._verify_overlay()
 
 	def _verify_overlay(self):
@@ -54,17 +96,20 @@ class outRepo(object):
 		return True
 
 	@property
-	def overlay_repo_dir(self):
+	def vcs(self):
+		assert self._vcs
+		return _vcs
+
+	@vcs.setter
+	def vcs(self, value):
+		# vcs should only be set once, via self.__init__ -> VCS.__init__ codepath
+		assert value.repo == self, _vcs == None
+		_vcs = value
+
+	@property
+	def overlay_root(self):
 		""":return: The directory of the targeted overlay repository"""
-		return self.repo.path
-
-	def __eq__(self, rhs):
-		if isinstance(rhs, outRepo):
-			return self.overlay_repo_dir == rhs.overlay_repo_dir
-		return False
-
-	def __ne__(self, rhs):
-		return not self.__eq__(rhs)
+		return self._vcs.overlay_root
 
 	def __repr__(self):
-		return '<OverlayUpstreamTracking.outRepo "%s">' % self.overlay_repo_dir
+		return '<OverlayUpstreamTracking.outRepo "%s" %s>' % (self.overlay_root, type(self._vcs).__name__)
