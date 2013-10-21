@@ -10,6 +10,6 @@ setup(name='overlay-upstream-tracking',
       author_email='gmt@be-evil.net',
       packages=['OverlayUpstreamTracking'],
       url='http://fixme/',
-      scripts=['scripts/pull-upstream-tracking'],
+      scripts=['scripts/pull-upstream-tracking', 'scripts/init-upstream-tracking'],
       requires=['GitPython (>=0.3.1)'],
       )

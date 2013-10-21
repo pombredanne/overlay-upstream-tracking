@@ -1,0 +1,14 @@
+#!python
+
+import argparse
+
+from git.exc import InvalidGitRepositoryError
+from OverlayUpstreamTracking.outRepo import outRepo
+
+parser = argparse.ArgumentParser(description='Tool to initialize git repositories for use with the overlay-upstream-tracking framework.')
+
+parser.add_argument('-o', '--overlay',  action='store', dest='overlaydir', metavar='OVERLAY-REPOSITORY-GIT-URL', help='overlay git repository url or file location', default=None)
+
+args = vars(parser.parse_args())
+
+print("overlaydir == %s" % args['overlaydir'])
