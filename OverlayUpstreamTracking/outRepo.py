@@ -98,6 +98,8 @@ class outRepo(object):
 		# not strictly needed but for clarity: the one-off setter sort-of relies on this
 		self._vcs = None
 		self._vcs = vcstype(self, overlaydir)
+
+		# filesystem-level sanity checks
 		self._verify_overlay()
 
 	def _check_path_isdir(self, path):
