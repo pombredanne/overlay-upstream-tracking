@@ -2,13 +2,31 @@
 
 import argparse
 
-from git.exc import InvalidGitRepositoryError
+from git.exc import InvalidGitRepositoryError, NoSuchPathError
 from OverlayUpstreamTracking.outRepo import outRepo
+from os import getcwd
+from sys import exit, stderr
 
-parser = argparse.ArgumentParser(description='Tool to initialize git repositories for use with the overlay-upstream-tracking framework.')
+parser = argparse.ArgumentParser(description='Tool to initialize git repositories for use with the overlay-upstream-tracking framework.',prog='init-upstream-tracking')
 
-parser.add_argument('-o', '--overlay',  action='store', dest='overlaydir', metavar='OVERLAY-REPOSITORY-GIT-URL', help='overlay git repository url or file location', default=None)
+parser.add_argument('-o', '--overlay',  action='store', dest='overlaydir', metavar='OVERLAY-REPOSITORY-GIT-URL', help='overlay git repository url or file location (default: the git repository of the current working directory)', default=None)
 
 args = vars(parser.parse_args())
 
-print("overlaydir == %s" % args['overlaydir'])
+try:
+	theOR = outRepo(args['overlaydir'])
+except (InvalidGitRepositoryError, NoSuchPathError):
+	if args['overlaydir'] == None:
+		stderr.write('The current working directory "' + getcwd() + '" does not\n')
+		stderr.write('appear to belong to a git repository.  Either change it\n')
+		stderr.write('so that it does, or supply one with the --overlay argument.\n')
+	else:
+		stderr.write('The requested location "' + args['overlaydir'] + '" does not\n')
+		stderr.write('appear to contain a git repository.  Unable to proceed.\n')
+
+	stderr.write('\n')
+	parser.print_help()
+	stderr.write('\n')
+	exit('Valid git repository not specified or detected.')
+
+print('Overlay Directory == "' + theOR.overlay_repo_dir + '"')
