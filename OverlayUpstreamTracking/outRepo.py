@@ -1,4 +1,4 @@
-from git import Repo
+from git import Repo,GitCmdObjectDB
 from os import getcwd
 
 class outRepo:
