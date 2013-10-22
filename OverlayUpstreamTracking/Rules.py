@@ -175,7 +175,6 @@ class Luthor(object):
 		'LT',
 		'GE',
 		'LE',
-		'HASH',
 		'SEMICOLON',
 		'CATEGORY',
 		'PN',
@@ -192,4 +191,14 @@ class Luthor(object):
 		'PASS',
 		'UPDATE',
 		'UPGRADEOVERLAY',
+		'COMMENT',
 	)
+	# Regex rules for simple tokens
+
+	t_ignore = " \t"
+
+	t_ignore_COMMENT = r'\#.*'
+
+	def t_newline(self, t):
+		r'\n+'
+		t.lexer.lineno += len(t.value)
