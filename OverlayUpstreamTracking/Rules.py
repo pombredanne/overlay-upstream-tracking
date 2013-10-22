@@ -155,6 +155,10 @@ from ply.lex import TOKEN
 # If a great number of novel ebuilds or eclasses exist in your overlay you may wish to automatically "pass"
 # those ebuilds so that overlay-upstream-tracking will not get bogged down in pointeless, expensive SLOT
 # computations for each one.
+#
+# Note that there is no portage_slot function -- this omission is because portage_atom always returns
+# a result in ${CATEGORY}/${PN}-${PVR}:${SLOT} format, and therefore an equivalent result may be
+# achieved by using slot(portage_atom("${foo}")).
 class Luthor(object):
 	reserved = {
 		'if': 'IF',
