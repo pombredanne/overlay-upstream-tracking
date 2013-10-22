@@ -156,10 +156,28 @@ from ply.lex import TOKEN
 # those ebuilds so that overlay-upstream-tracking will not get bogged down in pointeless, expensive SLOT
 # computations for each one.
 class Luthor(object):
-	tokens = (
-		'IF',
-		'ELSE',
-		'ELIF',
+	reserved = {
+		'if': 'IF',
+		'else': 'ELSE',
+		'elif': 'ELIF',
+		'revbump': 'REVBUMP',
+		'pn': 'PN',
+		'pv': 'PV',
+		'pr': 'PR',
+		'pvr': 'PVR',
+		'p': 'P',
+		'slot': 'SLOT',
+		'category': 'CATEGORY',
+		'portage_atom': 'PORTAGE_ATOM',
+		'portage_repo': 'PORTAGE_REPO',
+		'warn': 'WARN',
+		'punt': 'PUNT',
+		'die': 'DIE',
+		'pass': 'PASS',
+		'update': 'UPDATE',
+		'upgrade_overlay': 'UPGRADEOVERLAY',
+	}
+	tokens = [
 		'LPAREN',
 		'RPAREN',
 		'LCURLY',
@@ -167,7 +185,6 @@ class Luthor(object):
 		'QUOTATIONMARK',
 		'COLONEQUALS',
 		'PLUSPLUSPLUS',
-		'REVBUMP',
 		'EQUALSEQUALS',
 		'BANGEQUALS',
 		'TILDEEQUALS',
@@ -176,23 +193,10 @@ class Luthor(object):
 		'GE',
 		'LE',
 		'SEMICOLON',
-		'CATEGORY',
-		'PN',
-		'PV',
-		'PR',
-		'PVR',
-		'P',
-		'SLOT',
-		'PORTAGE_ATOM',
-		'PORTAGE_REPO',
-		'WARN',
-		'PUNT',
-		'DIE',
-		'PASS',
-		'UPDATE',
-		'UPGRADEOVERLAY',
 		'COMMENT',
-	)
+		'ID',
+	] + list(reserved.values())
+
 	# Regex rules for simple tokens
 
 	t_ignore = " \t"
@@ -202,3 +206,9 @@ class Luthor(object):
 	def t_newline(self, t):
 		r'\n+'
 		t.lexer.lineno += len(t.value)
+
+	# http://stackoverflow.com/questions/2039140
+	def t_ID(self, t):
+		r'[^\W\d]\w*'
+		t.type = reserved.get(t.value, 'ID')
+		return t
