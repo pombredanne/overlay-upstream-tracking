@@ -295,7 +295,7 @@ class Luthor(object):
 		t.lexer.begin('INITIAL')
 		return t
 
-	def t_ALL_error(self, t):
+	def t_ANY_error(self, t):
 		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (
 			t.lexer.lineno, t.value[0]))
 
