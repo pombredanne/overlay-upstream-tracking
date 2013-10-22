@@ -134,6 +134,9 @@ from ply.lex import TOKEN
 # a given less-specific atom.  The function "revbump" takes a given fully-qualified atom and adds
 # one to the revision number, so, i.e, =sys-devel/gcc-4.6.4 would become =sys-devel/gcc-4.6.4-r1.
 #
+# There is no such thing as user-defined functions, so henceforth 'functions' can be taken to mean
+# 'built-in functions'.
+#
 # For eclasses, many of the built-in variables and functions are not applicable.  ${CATEGORY} is the fake-ish
 # category "eclass" and ${PV} and similar varibles are always the empty string.  It is best to put separate
 # logic for eclasses into the eclass directory to prevent any funny-business resulting from these differences.
