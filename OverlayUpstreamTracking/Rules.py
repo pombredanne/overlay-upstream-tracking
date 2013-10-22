@@ -1,4 +1,5 @@
 import ply.lex as lex
+from ply.lex import TOKEN
 
 # Rules are applied in order of precedence to each ebuild and eclass in the overlay
 # until one of them "binds" (more on what that means to follow).
@@ -178,7 +179,6 @@ class Luthor(object):
 		'LE',
 		'HASH',
 		'SEMICOLON',
-		'DO',
 		'CATEGORY',
 		'PN',
 		'PV',
@@ -189,4 +189,9 @@ class Luthor(object):
 		'PORTAGE_ATOM',
 		'PORTAGE_REPO',
 		'WARN',
+		'PUNT',
+		'DIE',
+		'PASS',
+		'UPDATE',
+		'UPGRADEOVERLAY',
 	)
