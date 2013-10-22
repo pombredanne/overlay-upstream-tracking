@@ -1,0 +1,14 @@
+upstream_atom := portage_atom(${CATEGORY}/${PN}:${SLOT});
+upstream_PVR := pvr(${upstream_atom});
+upstream_PV := pv(${upstream_atom});
+
+if ("${PV}" ~= '9999$') {
+	if ("${upstream_PVR}" > pvr("${CATEGORY}/${PF}")) {
+		die("Upstream ebuild version bigger than live version: ${upstream_atom}.  This must be fixed manually.");
+	};
+} elif ("${upstream_PVR}" >= pvr("${CATEGORY}/${PF}")) {
+	upgrade_overlay(revbump("=${CATEGORY}/" +++ pn("${portage_atom}") +++ "${upstream_PVR}"))
+};
+
+upstream_REPO := portage_repo("${portage_atom}");
+update("${portage_atom}::${upstream_REPO}");
