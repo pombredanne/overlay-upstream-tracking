@@ -2,7 +2,7 @@ upstream_atom := portage_atom("${CATEGORY}/${PN}:${SLOT}");
 upstream_PVR := pvr("${upstream_atom}");
 upstream_PV := pv("${upstream_atom}");
 
-if ("${PV}" ~= '9999$') {
+if ("${PV}" ~= "9999\$") {
 	if ("${upstream_PVR}" > pvr("${CATEGORY}/${PF}")) {
 		die("Upstream ebuild version bigger than live version: ${upstream_atom}.  This must be fixed manually.");
 	};
