@@ -200,9 +200,20 @@ class Luthor(object):
 		'LE',
 		'SEMICOLON',
 		'COMMENT',
-		'QUOTATIONMARK',
+		'OPENQUOTE',
+		'CLOSEQUOTE',
+		'VARIABLESUBSTITUTION',
+		'ESCAPEDQUOTE',
+		'ESCAPEDDOLLAR',
+		'ESCAPEDSLASH',
+		'ESCAPEDNEWLINE',
+		'STRINGLITERALTEXT',
 		'ID',
 	] + list(reserved.values())
+
+	states = (
+		('stringliteral', 'exclusive'),
+	)
 
 	# Regex rules for simple tokens
 
@@ -229,11 +240,60 @@ class Luthor(object):
 		r'\n+'
 		t.lexer.lineno += len(t.value)
 
+	# I see no need for fancy multi-line string capabilities,
+	# even less so since we offer procedural string-concatenations,
+	# and escaped newlines (already excessive for our purposes).
+	def t_stringliteral_newline(self, t):
+		r'\n'
+		raise RulesSyntaxError("line %s: Illegal carraige return in string" % (t.lexer.lineno))
+
 	# http://stackoverflow.com/questions/2039140
 	def t_ID(self, t):
 		r'[^\W\d]\w*'
 		t.type = reserved.get(t.value, 'ID')
 		return t
 
-	def t_error(self, t):
-		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (t.lineno, t.value[0]))
+	def t_stringliteral_ESCAPEDQUOTE(self, t):
+		r'\\"'
+		return t
+
+	def t_stringliteral_ESCAPEDDOLLAR(self, t):
+		r'\\\$'
+		return t
+
+	def t_stringliteral_ESCAPEDSLASH(self, t):
+		r'\\\\'
+		return t
+
+	def t_stringliteral_ESCAPEDNEWLINE(self, t):
+		r'\\n'
+		return t
+
+	def t_stringliteral_VARIABLESUBSTITUTION(self, t):
+		r'\$\{[^\W\d]\w*\}'
+		return t
+
+	# avoid confusing lexer results; valid variable substitutions
+	# should have been picked up by the preceeding token rule
+	def t_stringliteral_illegal_variable_substitution(self, t):
+		r'\$[^}]*'
+		raise RulesSyntaxError("line %s: Illegal variable substitution in string literal: '%s'" % (
+			t.lexer.lineno, t.value))
+
+	def t_stringliteral_STRINGLITERALTEXT(self, t):
+		r'[^\\"\$]*'
+		return t
+
+	def t_OPENQUOTE(self, t):
+		r'"'
+		t.lexer.begin('stringliteral')
+		return t
+
+	def t_stringliteral_CLOSEQUOTE(self, t):
+		r'"'
+		t.lexer.begin('INITIAL')
+		return t
+
+	def t_ALL_error(self, t):
+		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (
+			t.lexer.lineno, t.value[0]))
