@@ -1,6 +1,9 @@
 import ply.lex as lex
 from ply.lex import TOKEN
 
+class RulesSyntaxError(Exception):
+	"""Thrown if errors are encountered parsing the rules files"""
+
 # Rules are applied in order of precedence to each ebuild and eclass in the overlay
 # until one of them "binds" (more on what that means to follow).
 #
@@ -186,7 +189,6 @@ class Luthor(object):
 		'RPAREN',
 		'LCURLY',
 		'RCURLY',
-		'QUOTATIONMARK',
 		'COLONEQUALS',
 		'PLUSPLUSPLUS',
 		'EQUALSEQUALS',
@@ -198,6 +200,7 @@ class Luthor(object):
 		'LE',
 		'SEMICOLON',
 		'COMMENT',
+		'QUOTATIONMARK',
 		'ID',
 	] + list(reserved.values())
 
@@ -206,6 +209,21 @@ class Luthor(object):
 	t_ignore = " \t"
 
 	t_ignore_COMMENT = r'\#.*'
+
+	t_LPAREN = r'\('
+	t_RPAREN = r'\)'
+	t_LCURLY = r'{'
+	t_RCURLY = r'}'
+	t_COLONEQUALS = r':='
+	t_PLUSPLUSPLUS = r'\+\+\+'
+	t_EQUALSEQUALS = r'=='
+	t_BANGEQUALS = r'!='
+	t_TILDEEQUALS = r'~='
+	t_GT = r'>'
+	t_LT = r'<'
+	t_GE = r'>='
+	t_LE = r'<='
+	t_SEMICOLON = r';'
 
 	def t_newline(self, t):
 		r'\n+'
@@ -216,3 +234,6 @@ class Luthor(object):
 		r'[^\W\d]\w*'
 		t.type = reserved.get(t.value, 'ID')
 		return t
+
+	def t_error(self, t):
+		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (t.lineno, t.value[0])
