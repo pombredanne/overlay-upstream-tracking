@@ -304,5 +304,14 @@ class Luthor(object):
 		self.lexer = lex.lex(module=self, **kwargs, reflags=self.reflags)
 
 	# provide a way to get unicode parsing
-	def __init__(self, reflags=):
+	def __init__(self, reflags=None, **kwargs):
 		self.reflags = reflags
+		self.build(**kwargs)
+
+	# test output
+	def test(self, data):
+		self.lexer.input(data)
+		while True:
+			tok = lexer.token()
+			if not tok: break
+			print tok
