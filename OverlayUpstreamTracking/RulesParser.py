@@ -1,6 +1,6 @@
 import ply.lex as lex
-from ply.lex import TOKEN
 import re
+import ply.yacc as yacc
 
 class RulesSyntaxError(Exception):
 	"""Thrown if errors are encountered parsing the rules files"""
