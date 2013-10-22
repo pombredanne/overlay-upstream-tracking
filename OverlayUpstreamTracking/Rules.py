@@ -126,7 +126,7 @@ import ply.lex as lex
 #
 # Manifests and other such files are deliberately omittted.
 #
-# The functions pv, pvr, pf, slot, and category are simple string-extraction functions with obvious
+# The functions pv, pvr, pf, pn, slot, and category are simple string-slicer-dicer functions with obvious
 # meaning. the portage_repo <value> function finds the portage repository containing the upstream ebuild
 # selected by <value> (if more than one are selected the results are undefined).  The portage_atom
 # function will attempt to get a fully-qualified =cat/foo-3.3-r1:3.3 type atom corresponding to
@@ -158,23 +158,35 @@ import ply.lex as lex
 #
 class Luthor(object):
 	tokens = (
-			'WHEN',
+			'IF',
+			'ELSE',
+			'ELIF',
 			'LPAREN',
 			'RPAREN',
 			'LCURLY',
 			'RCURLY',
-			'EQUALSEQUALS',
+			'QUOTATIONMARK',
 			'COLONEQUALS',
+			'PLUSPLUSPLUS',
+			'REVBUMP',
+			'EQUALSEQUALS',
+			'BANGEQUALS',
+			'TILDEEQUALS',
+			'GT',
+			'LT',
+			'GE',
+			'LE',
+			'HASH',
 			'SEMICOLON',
 			'DO',
 			'CATEGORY',
 			'PN',
 			'PV',
+			'PR',
+			'PVR',
 			'P',
 			'SLOT',
-			'MAJORSLOT',
-			'MINORSLOT',
-			'MATCHES',
-			'ATOM',
+			'PORTAGE_ATOM',
+			'PORTAGE_REPO',
 			'WARN',
 	)
