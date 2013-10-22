@@ -252,7 +252,7 @@ class Luthor(object):
 	# http://stackoverflow.com/questions/2039140
 	def t_ID(self, t):
 		r'[^\W\d]\w*'
-		t.type = reserved.get(t.value, 'ID')
+		t.type = self.__class__.reserved.get(t.value, 'ID')
 		return t
 
 	def t_stringliteral_ESCAPEDQUOTE(self, t):
