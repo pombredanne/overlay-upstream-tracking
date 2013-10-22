@@ -219,6 +219,7 @@ class Luthor(object):
 	# Regex rules for simple tokens
 
 	t_ignore = " \t"
+	t_stringliteral_ignore = ""
 
 	t_ignore_COMMENT = r'\#.*'
 
