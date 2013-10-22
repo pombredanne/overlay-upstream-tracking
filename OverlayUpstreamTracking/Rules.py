@@ -1,5 +1,6 @@
 import ply.lex as lex
 from ply.lex import TOKEN
+import re
 
 class RulesSyntaxError(Exception):
 	"""Thrown if errors are encountered parsing the rules files"""
@@ -297,3 +298,11 @@ class Luthor(object):
 	def t_ALL_error(self, t):
 		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (
 			t.lexer.lineno, t.value[0]))
+
+	# Build the lexer
+	def build(self, **kwargs):
+		self.lexer = lex.lex(module=self, **kwargs, reflags=self.reflags)
+
+	# provide a way to get unicode parsing
+	def __init__(self, reflags=):
+		self.reflags = reflags
