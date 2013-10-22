@@ -236,4 +236,4 @@ class Luthor(object):
 		return t
 
 	def t_error(self, t):
-		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (t.lineno, t.value[0])
+		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (t.lineno, t.value[0]))
