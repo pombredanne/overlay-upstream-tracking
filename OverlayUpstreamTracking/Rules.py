@@ -155,11 +155,6 @@ from ply.lex import TOKEN
 # If a great number of novel ebuilds or eclasses exist in your overlay you may wish to automatically "pass"
 # those ebuilds so that overlay-upstream-tracking will not get bogged down in pointeless, expensive SLOT
 # computations for each one.
-#
-# Note that just because you request an upgrade in your code does not mean the corresponding filesystem
-# changes will actually occur.  By default the command-line tools will simply return a warning in this
-# case and refuse to upgrade the tracking branch.  However, if --force arguments are provided, the
-#
 class Luthor(object):
 	tokens = (
 		'IF',
