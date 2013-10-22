@@ -301,10 +301,10 @@ class Luthor(object):
 
 	# Build the lexer
 	def build(self, **kwargs):
-		self.lexer = lex.lex(module=self, **kwargs, reflags=self.reflags)
+		self.lexer = lex.lex(module=self, reflags=self.reflags, **kwargs)
 
 	# provide a way to get unicode parsing
-	def __init__(self, reflags=None, **kwargs):
+	def __init__(self, reflags=0, **kwargs):
 		self.reflags = reflags
 		self.build(**kwargs)
 
