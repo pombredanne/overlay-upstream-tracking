@@ -282,7 +282,7 @@ class Luthor(object):
 			t.lexer.lineno, t.value))
 
 	def t_stringliteral_STRINGLITERALTEXT(self, t):
-		r'[^\\"\$]*'
+		r'[^\\"\$][^\\"\$]*'
 		return t
 
 	def t_OPENQUOTE(self, t):
