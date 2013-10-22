@@ -164,6 +164,9 @@ class RulesSyntaxError(Exception):
 # a result in ${CATEGORY}/${PN}-${PVR}:${SLOT} format, and therefore an equivalent result may be
 # achieved by using slot(portage_atom("${foo}")).
 class Luthor(object):
+	"""PseudoLexer which both contains the requied infrastructure
+	to build a real lexer and proxies enough of the Lexer interface
+	to satisfy LRParser's needs."""
 	reserved = {
 		'if': 'IF',
 		'else': 'ELSE',
@@ -300,19 +303,87 @@ class Luthor(object):
 		raise RulesSyntaxError("line %s: Illegal character in input: '%s'" % (
 			t.lexer.lineno, t.value[0]))
 
-	# Build the lexer
-	def build(self, **kwargs):
-		self.lexer = lex.lex(module=self, reflags=self.reflags, **kwargs)
+	#
+	# proxy magic
+	#
+	def __getattribute__(self, name):
+		try:
+			return super(Luthor, self).__getattribute__(name)
+		except AttributeError:
+			if name == '_proxy_namespace' or name == '_lexer':
+				raise
+			if not (hasattr(self, '_proxy_namespace') and hasattr(self, '_lexer')):
+				raise
+			if not name in self._proxy_namespace:
+				raise
+			return self._proxy_namespace[name]
 
-	# provide a way to get unicode parsing
+	def __delattr__(self, name):
+		haddit = True
+		try:
+			super(Luthor, self).__getattribute__(name)
+		except AttributeError:
+			haddit = False
+		if not haddit and hasattr(self, '_proxy_namespace') and name in self._proxy_namespace[name]:
+			del self._proxy_namespace[name]
+			return None
+		return super(Luthor, self).__delattr__(name)
+
+	def __str__(self):
+		if hasattr(self, '_lexer'):
+			return self._lexer.__str__()
+		return super(Luthor, self).__str__()
+
+	def __repr__(self):
+		if hasattr(self, '_lexer'):
+			return self._lexer.__repr__()
+		return super(Luthor, self).__repr__()
+
+	def _cons_proxy_method(self, methodname):
+		class _proxy_method_descriptor(object):
+			def __init__(self, lexer):
+				self._lexer = lexer
+			def __get__(self, instance, owner):
+				return MethodType(self, instance, owner)
+			def __call__(self, *args, **kwargs):
+				return getattr(self._lexer, methodname)(*args, **kwargs)
+
+		class _proxy_descriptor(object):
+			def __init__(self, lexer):
+				self._lexer = lexer
+			def __get__(self, obj, objtype):
+				return getattr(self._lexer, methodname)
+			def __set__(self, obj, val):
+				setattr(self._lexer, methodname, val)
+
+		if getattr(self._lexer, methodname).__class__.__name__ == 'instancemethod':
+			return _proxy_method_descriptor(self._lexer)
+		else:
+			return _proxy_descriptor(self._lexer)
+
+	_proxy_names = [
+		'clone', 'writetab', 'readtab', 'input', 'begin', 'push_state', 'pop_state',
+		'current_state', 'skip', 'token', '__iter__', 'next', '__next__', '__repr__',
+		'lineno', 'lexpos', 'lexre', 'lexreflags', 'lexretext', 'lexstate', 'lexstateerrorf',
+		'lexstateignore', 'lexstateinfo', 'lexstatere', 'lexstatenames', 'lexstateretext',
+		'lexstatestack', 'lextokens'
+	]
+
+	# reflags |= re.UNICODE to get unicode parsing
 	def __init__(self, reflags=0, **kwargs):
-		self.reflags = reflags
-		self.build(**kwargs)
+		self._proxy_namespace = {}
+		self._lexer = lex.lex(module=self, reflags=reflags, **kwargs)
+		for name in self.__class__._proxy_names:
+			if hasattr(self._lexer, name):
+				self._proxy_namespace[name] = self._cons_proxy_method(name)
 
 	# test output
 	def test(self, data):
-		self.lexer.input(data)
+		self.input(data)
 		while True:
-			tok = self.lexer.token()
+			tok = self.token()
 			if not tok: break
 			print tok
+
+class DontTalkBack(object):
+	pass
