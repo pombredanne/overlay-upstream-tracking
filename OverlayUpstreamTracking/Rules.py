@@ -313,6 +313,6 @@ class Luthor(object):
 	def test(self, data):
 		self.lexer.input(data)
 		while True:
-			tok = lexer.token()
+			tok = self.lexer.token()
 			if not tok: break
 			print tok
