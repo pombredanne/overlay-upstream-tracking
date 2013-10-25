@@ -1,6 +1,7 @@
 import ply.lex as lex
 import re
 import ply.yacc as yacc
+from inspect import isclass
 
 class RulesSyntaxError(Exception):
 	"""Thrown if errors are encountered parsing the rules files"""
@@ -202,6 +203,48 @@ class NewLexer(object, lex.Lexer):
 	def __repr__(self):
 		return "<%s (with _lexer: %s)>" % (self.__class__.__name__, repr(self._lexer))
 
+class NewParser(object):
+	"""
+	Base class for a lexer/parser that has the rules defined as methods
+	"""
+	def __init__(self, lexer, **kw):
+		self.debug = kw.get('debug', 0)
+		self.names = { }
+		try:
+			modname = os.path.split(os.path.splitext(__file__)[0])[1] + "_" + self.__class__.__name__
+		except:
+			modname = "parser"+"_"+self.__class__.__name__
+		self.debugfile = modname + ".dbg"
+		self.tabmodule = modname + "_" + "parsetab"
+		#print self.debugfile, self.tabmodule
+
+		# Build the lexer (if passed a class for the lexer, instantiate it)
+		if isclass(lexer):
+			self._lexer = lexer()
+		else:
+			self._lexer = lexer
+
+		self._parser = yacc.yacc(
+			module=self,
+			debug=self.debug,
+			debugfile=self.debugfile,
+			tabmodule=self.tabmodule
+		)
+
+	def parse(self, data):
+		self._parser.parse(s, lexer=self._lexer)
+
+	@property
+	def tokens(self):
+		return self._lexer.tokens
+
+	@property
+	def precedence(self):
+		return self.get_precedence()
+
+	def get_precedence(self):
+		return ()
+
 class Luthor(NewLexer):
 	"""NewLexer-based lexer for rules language"""
 	reserved = {
@@ -348,5 +391,28 @@ class Luthor(NewLexer):
 			if not tok: break
 			print tok
 
-class DontTalkBack(object):
-	pass
+class RulesParser(NewParser):
+	def __init__(self, lexer=None, **kwargs):
+		if lexer == None:
+			lexer = Luthor
+		super(RulesParser, self).__init__(lexer, **kwargs)
+
+	def p_statements(self, p):
+		'statements : statement SEMICOLON'
+		'           | statement SEMICOLON statements'
+		if len(p) == 2:
+			p[0] = ( 'STATEMENTS', p[1] ) + p[2][1:]
+		else:
+			pass
+
+	def p_statement(self, p):
+		'statement : assignment'
+		p[0] = p[1]
+
+	def p_assignment(self, p):
+		'assignment : ID COLONEQUALS value'
+		p[0] = ( 'ASSIGN', p[1], p[3] )
+
+	def p_value(self, p):
+		'value : STRINGLITERAL'
+		p[0] = p[1]
