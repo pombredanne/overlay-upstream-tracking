@@ -232,7 +232,7 @@ class NewParser(object):
 		)
 
 	def parse(self, data):
-		self._parser.parse(s, lexer=self._lexer)
+		return self._parser.parse(data, lexer=self._lexer)
 
 	@property
 	def tokens(self):
