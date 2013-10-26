@@ -407,16 +407,25 @@ class RulesParser(NewParser):
 			lexer = Luthor
 		super(RulesParser, self).__init__(lexer, **kwargs)
 
+	def p_rulesprogram(self, p):
+		'rulesprogram : statements'
+		p[0] = ( 'RULESPROGRAM', ) + p[1]
+
 	def p_statements(self, p):
-		'statements : statement SEMICOLON'
-		'           | statement SEMICOLON statements'
-		if len(p) == 2:
-			p[0] = ( 'STATEMENTS', p[1] ) + p[2][1:]
+		'''statements : statements statement
+		              | empty'''
+
+		if len(p) == 3:
+			p[0] = p[1] + ( p[2], )
 		else:
-			pass
+			p[0] = ()
+
+	def p_empty(self, p):
+		'empty :'
+		pass
 
 	def p_statement(self, p):
-		'statement : assignment'
+		'statement : assignment SEMICOLON'
 		p[0] = p[1]
 
 	def p_assignment(self, p):
