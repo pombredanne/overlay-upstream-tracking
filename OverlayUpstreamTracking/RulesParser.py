@@ -210,7 +210,6 @@ class NewParser(object):
 	"""
 	def __init__(self, lexer, **kw):
 		self.debug = kw.get('debug', 0)
-		self.names = { }
 		try:
 			modname = os.path.split(os.path.splitext(__file__)[0])[1] + "_" + self.__class__.__name__
 		except:
