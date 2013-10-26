@@ -214,13 +214,19 @@ class NewParser(object):
 			modname = os.path.split(os.path.splitext(__file__)[0])[1] + "_" + self.__class__.__name__
 		except:
 			modname = "parser"+"_"+self.__class__.__name__
-		self.debugfile = modname + ".dbg"
-		self.tabmodule = modname + "_" + "parsetab"
+		self.debugfile = kw.get('debugfile', modname + ".dbg")
+		self.tabmodule = kw.get('tabmodule', modname + "_" + "parsetab")
 		#print self.debugfile, self.tabmodule
 
 		# Build the lexer (if passed a class for the lexer, instantiate it)
 		if isclass(lexer):
-			self._lexer = lexer()
+			self._lexer = lexer(
+				debug=self.debug,
+				**dict(filter(lambda(x): x in [
+					'optimize', 'debuglog', 'outputdir',
+					'errorlog', 'reflags', 'lextab', 'nowarn'
+				], kw))
+			)
 		else:
 			self._lexer = lexer
 
@@ -228,7 +234,11 @@ class NewParser(object):
 			module=self,
 			debug=self.debug,
 			debugfile=self.debugfile,
-			tabmodule=self.tabmodule
+			tabmodule=self.tabmodule,
+			**dict(filter(lambda(x): x in [
+				'method', 'start', 'check_recursion', 'optimize', 'write_tables',
+				'outputdir', 'debuglog', 'errorlog', 'picklefile'
+			], kw))
 		)
 
 	def parse(self, data):
