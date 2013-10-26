@@ -170,7 +170,7 @@ class NewLexer(object, lex.Lexer):
 	'''Wraps the old-style lex.Lexer class as a new-style class.'''
 
 	def __new__(cls, *args, **kwargs):
-		obj = object.__new__(cls, *args, **kwargs)
+		obj = object.__new__(cls)
 		obj._lexer = lex.lex(module=obj, **kwargs)
 		return obj
 
