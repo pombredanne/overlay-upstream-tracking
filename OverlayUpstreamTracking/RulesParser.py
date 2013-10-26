@@ -1,6 +1,7 @@
 import ply.lex as lex
 import re
 import ply.yacc as yacc
+import os
 from inspect import isclass
 
 class RulesSyntaxError(Exception):
