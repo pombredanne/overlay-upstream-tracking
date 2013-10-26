@@ -433,5 +433,38 @@ class RulesParser(NewParser):
 		p[0] = ( 'ASSIGN', p[1], p[3] )
 
 	def p_value(self, p):
-		'value : STRINGLITERAL'
+		'value : string'
 		p[0] = p[1]
+
+	def p_string(self, p):
+		'string : OPENQUOTE creamyfilling CLOSEQUOTE'
+		p[0] = ( 'STRING', ) + p[2]
+
+	def p_creamyfilling(self, p):
+		'''creamyfilling : creamyfilling stringpart
+		                 | empty'''
+		if len(p) == 3:
+			p[0] = p[1] + ( p[2], )
+		else:
+			p[0] = ()
+
+	def p_stringpart(self, p):
+		'''stringpart : varsub
+		              | escape
+			      | literal'''
+		p[0] = p[1]
+
+	def p_varsub(self, p):
+		'varsub : VARIABLESUBSTITUTION'
+		p[0] = ( 'VARIABLE-SUBSTITUTION', p[1][2:-1] )
+
+	def p_escape(self, p):
+		'''escape : ESCAPEDQUOTE
+		          | ESCAPEDDOLLAR
+			  | ESCAPEDSLASH
+			  | ESCAPEDNEWLINE'''
+		p[0] = ( 'STRINGLITERAL', p[1][1] )
+
+	def p_literal(self, p):
+		'literal : STRINGLITERALTEXT'
+		p[0] = ( 'STRINGLITERAL', p[1] )
