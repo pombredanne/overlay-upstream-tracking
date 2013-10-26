@@ -16,18 +16,24 @@
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from distutils.core import setup
+
 setup(
 	name='overlay-upstream-tracking',
-	version='0.1',
+	version='0.1.0',
+	description='Gentoo Overlay Maintenance Toolkit',
+	long_description='A toolkit for tracking and merging upstream changes into Gentoo overlays',
+	license='GNU General Public License v2 (GPLv2)',
 	classifiers=[
 		'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
 		'Topic :: Software Development :: Version Control',
 	],
-	description='Tools to partially automate tracking of upstream ebuild/eclass code deltas in order to ease the overlay maintenace process.',
 	author='Gregory M. Turner',
 	author_email='gmt@be-evil.net',
+	maintainer='Gregory M. Turner',
+	maintainer_email='gmt@be-evil.net',
 	packages=['OverlayUpstreamTracking'],
-	url='http://fixme/',
+	data_files=[('outrules.d', ['outrules.d/base'])],
+	url='http://github.com/gmt/overlay-upstream-tracking',
 	scripts=['scripts/pull-upstream-tracking', 'scripts/init-upstream-tracking'],
 	requires=['dulwich (>=0.9.1)', 'ply (>=3.4)'],
 )
