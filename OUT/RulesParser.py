@@ -166,14 +166,11 @@ class Luthor(NewLexer):
 	states = (
 		('stringliteral', 'exclusive'),
 	)
-
+	#
 	# Regex rules for simple tokens
-
+	#
 	t_ignore = " \t"
 	t_stringliteral_ignore = ""
-
-	t_ignore_COMMENT = r'\#.*'
-
 	t_LPAREN = r'\('
 	t_RPAREN = r'\)'
 	t_LCURLY = r'{'
@@ -192,6 +189,11 @@ class Luthor(NewLexer):
 	def t_newline(self, t):
 		r'\n+'
 		t.lexer.lineno += len(t.value)
+
+	# need a function to ensure comments have precedence over everything but newlines
+	def t_ignore_COMMENT(self, t):
+		r'\#[^\n]*'
+		pass
 
 	# I see no need for fancy multi-line string capabilities,
 	# even less so since we offer procedural string-concatenations,
