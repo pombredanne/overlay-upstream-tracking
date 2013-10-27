@@ -96,13 +96,13 @@ class Repo(object):
 		much as the git command-line would do.
 
 		:param vcstype: The VCS type to instantiate.  Currently, only gitVCS is implemented
-		but hypothetically, any subclass implementing the OverlayUpstreamTracking.VCS interface
+		but hypothetically, any subclass implementing the OUT.VCS interface
 		could be used.
 
 		:raise NotARepository:
 		:raise NoSuchPathError:
 		:raise InvalidOverlayRepositoryError:
-		:return: OverlayUpstreamTracking.Repo"""
+		:return: OUT.Repo"""
 		if overlaydir == None or overlaydir == '':
 			overlaydir=getcwd()
 		else:
@@ -215,4 +215,4 @@ class Repo(object):
 		return self._vcs.overlay_root
 
 	def __repr__(self):
-		return '<OverlayUpstreamTracking.Repo "%s" %s>' % (self.overlay_root, type(self._vcs).__name__)
+		return '<OUT.Repo "%s" %s>' % (self.overlay_root, type(self._vcs).__name__)

@@ -15,7 +15,7 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-from OverlayUpstreamTracking.RulesParser import RulesParser
+from OUT.RulesParser import RulesParser
 from pkg_resources import Requirement, resource_filename
 from portage.const import EPREFIX
 import os
@@ -23,7 +23,7 @@ import os
 __all__ = [ 'GlobalRulesNotFoundException', 'get_global_rules_filepath' ]
 
 class GlobalRulesNotFoundException(Exception):
-	'''Thrown if the global rules repository is not present where OverlayUpstreamTracking.Rules
+	'''Thrown if the global rules repository is not present where OUT.Rules
 	   expects to find it (typically: /usr/share/overlay-upstream-tracking/outrules.d)'''
 
 # FIXME: I hate that we are forced to stop pretending we are platform independent here.

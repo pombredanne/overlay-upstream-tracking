@@ -33,7 +33,7 @@ setup(
 	author_email='gmt@be-evil.net',
 	maintainer='Gregory M. Turner',
 	maintainer_email='gmt@be-evil.net',
-	packages=['OverlayUpstreamTracking'],
+	packages=['OUT'],
 	data_files=[('share/overlay-upstream-tracking/outrules.d', ['outrules.d/base'])],
 	url='http://github.com/gmt/overlay-upstream-tracking',
 	scripts=['scripts/pull-upstream-tracking', 'scripts/init-upstream-tracking'],

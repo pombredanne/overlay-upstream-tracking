@@ -20,7 +20,7 @@
 import argparse
 
 from dulwich.errors import NotGitRepository
-from OverlayUpstreamTracking.Repo import Repo, NoSuchPathError
+from OUT.Repo import Repo, NoSuchPathError
 from os import getcwd
 from sys import exit, stderr
 
