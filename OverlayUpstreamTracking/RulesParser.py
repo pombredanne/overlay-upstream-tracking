@@ -487,4 +487,4 @@ class RulesParser(NewParser):
 		p[0] = ( 'STRINGLITERAL', p[1] )
 
 	def p_error(self, p):
-		raise RulesSyntaxError("line %s: Syntax error: '%s'" % (p.lineno(0), str(p)))
+		raise RulesSyntaxError("line %s: Syntax error: '%s'" % (p.lineno, p.value))
