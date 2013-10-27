@@ -34,7 +34,7 @@ setup(
 	maintainer='Gregory M. Turner',
 	maintainer_email='gmt@be-evil.net',
 	packages=['OverlayUpstreamTracking'],
-	data_files=[('outrules.d', ['outrules.d/base'])],
+	data_files=[('share/overlay-upstream-tracking/outrules.d', ['outrules.d/base'])],
 	url='http://github.com/gmt/overlay-upstream-tracking',
 	scripts=['scripts/pull-upstream-tracking', 'scripts/init-upstream-tracking'],
 	requires=['dulwich (>=0.9.1)', 'ply (>=3.4)'],
