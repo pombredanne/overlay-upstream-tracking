@@ -15,7 +15,7 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-from dulwich.repo import Repo
+from dulwich.repo import Repo as dwRepo
 from dulwich.errors import NotGitRepository
 from os import getcwd, F_OK, R_OK, X_OK, W_OK
 from os.path import isdir, islink, dirname
@@ -27,10 +27,10 @@ class InvalidOverlayRepositoryError(Exception):
 	"""Thrown if a valid git repository is specified but it does not contain a profiles/repo_name file"""
 
 class NoSuchPathError(Exception):
-	"""Thrown if an attempt is made to create an outRepo corresponding to a non-existent path"""
+	"""Thrown if an attempt is made to create a Repo corresponding to a non-existent path"""
 
 class NotARepository(Exception):
-	"""Thrown by outRepo() when the provided repostiroy directory is not a repository of the specified type"""
+	"""Thrown by Repo() when the provided repostiroy directory is not a repository of the specified type"""
 
 class RepositoryPermissionsError(InvalidOverlayRepositoryError):
 	"""Thrown when a requested operation cannot complete due to file permissions trouble"""
@@ -38,13 +38,13 @@ class RepositoryPermissionsError(InvalidOverlayRepositoryError):
 class VCS(object):
 	"""Abstract VCS support class"""
 	def __init__(self, outrepo):
-		"""Create VCS instance; outrepo is the parent outRepo to which this outVCS belongs.
+		"""Create VCS instance; outrepo is the parent Repo to which this outVCS belongs.
 		This is an abstract class by design -- it is the obligation of the subclass to
 		call this inhertied __init__ and additionally to process a third argument to __init__,
 		the overlay directory for the VCS repository instance, which, in the subclass constructor,
 		must be used to initialize the repository object.
 
-		:param outrepo: The outRepo instance to which this VCS instance will be forever married."""
+		:param outrepo: The Repo instance to which this VCS instance will be forever married."""
 		self.repo = outrepo
 		outrepo.vcs = self
 
@@ -65,7 +65,7 @@ class gitVCS(VCS):
 		origoverlaydir = overlaydir
 		while not self._gitrepo:
 			try:
-				self._gitrepo = Repo(overlaydir)
+				self._gitrepo = dwRepo(overlaydir)
 			except NotGitRepository as e:
 				oldoverlaydir = overlaydir
 				overlaydir = dirname(overlaydir)
@@ -83,12 +83,12 @@ class gitVCS(VCS):
 	def get_overlay_root(self):
 		return self._gitrepo.path
 
-class outRepo(object):
+class Repo(object):
 	"""Represents an overlay-upstream-tracking-enabled overlay, presumptively
 	under control by git"""
 
 	def __init__(self, overlaydir=None, vcstype=gitVCS):
-		"""Create a new outRepo instance
+		"""Create a new Repo instance
 
 		:param overlaydir: a path within a Gentoo overlay under git version-control.
 		If not provided, the current working directory will be used as a default.
@@ -102,11 +102,11 @@ class outRepo(object):
 		:raise NotARepository:
 		:raise NoSuchPathError:
 		:raise InvalidOverlayRepositoryError:
-		:return: OverlayUpstreamTracking.outRepo"""
+		:return: OverlayUpstreamTracking.Repo"""
 		if overlaydir == None or overlaydir == '':
 			overlaydir=getcwd()
 		else:
-			# it is valid in Repo to pass a file path, here, but 
+			# it is valid in dwRepo to pass a file path, here, but 
 			# for present purposes that seems crazy -- ensure it's
 			# a directory.
 			if islink(overlaydir) or (not isdir(overlaydir)):
@@ -215,4 +215,4 @@ class outRepo(object):
 		return self._vcs.overlay_root
 
 	def __repr__(self):
-		return '<OverlayUpstreamTracking.outRepo "%s" %s>' % (self.overlay_root, type(self._vcs).__name__)
+		return '<OverlayUpstreamTracking.Repo "%s" %s>' % (self.overlay_root, type(self._vcs).__name__)
