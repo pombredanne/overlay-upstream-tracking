@@ -17,6 +17,16 @@
 
 from OverlayUpstreamTracking.RulesParser import RulesParser
 from pkg_resources import Requirement, resource_filename
+from portage.const import EPREFIX
+import os
+
+class FileNotFoundException(Exception):
+	'''Thrown when file is not found'''
 
 def get_global_rules_filepath():
-	return resource_filename(Requirement.parse("overlay-upstream-tracking"), "outrules.d/base")
+	basepath = EPREFIX + '/usr/share/overlay-upstream-tracking/outrules.d/base';
+	if not os.path.isfile(basepath):
+		basepath = resource_filename(Requirement.parse("overlay-upstream-tracking"), "outrules.d/base")
+		if not os.path.isfile(basepath):
+			raise FileNotFoundException('outrules.d/base')
+	return os.path.dirname(basepath)
