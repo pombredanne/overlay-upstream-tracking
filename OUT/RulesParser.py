@@ -99,8 +99,43 @@ class NewParser(object):
 			], kw))
 		)
 
-	def parse(self, data):
-		return self._parser.parse(data, lexer=self._lexer)
+	def parse(self, data, **kw):
+		if 'lexer' in kw:
+			lexer = kw['lexer']
+			del(kw['lexer'])
+		else:
+			lexer = self._lexer
+		return self._parser.parse(data, lexer=lexer, **kw)
+
+	def parsedebug(self, data, **kw):
+		if 'lexer' in kw:
+			lexer = kw['lexer']
+			del(kw['lexer'])
+		else:
+			lexer = self._lexer
+		return self._parser.parsedebug(data, lexer=lexer, **kw)
+
+	def parseopt(self, data, **kw):
+		if 'lexer' in kw:
+			lexer = kw['lexer']
+			del(kw['lexer'])
+		else:
+			lexer = self._lexer
+		return self._parser.parseopt(data, lexer=lexer, **kw)
+
+	def parseopt_notrack(self, data, **kw):
+		if 'lexer' in kw:
+			lexer = kw['lexer']
+			del(kw['lexer'])
+		else:
+			lexer = self._lexer
+		return self._parser.parseopt_notrack(data, lexer=lexer, **kw)
+
+	def restart(self):
+		self._parser.restart()
+
+	def errok(self):
+		self._parser.errok()
 
 	@property
 	def tokens(self):
