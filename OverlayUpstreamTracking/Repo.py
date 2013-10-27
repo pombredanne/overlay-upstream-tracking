@@ -106,7 +106,7 @@ class Repo(object):
 		if overlaydir == None or overlaydir == '':
 			overlaydir=getcwd()
 		else:
-			# it is valid in dwRepo to pass a file path, here, but 
+			# it is valid in dwRepo to pass a file path, here, but
 			# for present purposes that seems crazy -- ensure it's
 			# a directory.
 			if islink(overlaydir) or (not isdir(overlaydir)):
