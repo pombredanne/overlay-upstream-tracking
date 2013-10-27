@@ -6,49 +6,28 @@ This software may be used and resdistributed under the terms
 of the GPL v2.  See COPYING for the gory details.
 
 This is a work in progress.  As of its writing many of the
-statements below are speculative statements of intention-to-implement
-rather than descriptions of actual implementation details.  I will
-attempt to keep this in sync with development, as I go, but
-please read the following with a grain of salt.
+statements below are 'todo' items only and not yet implemented.
+Also, while things are under development, I'm not bothering
+to keep it up-to-date, so please read the following with a
+big-ish grain of salt.
 
 If you maintain some Gentoo overlays you have probably noticed
 that although an overlay is easy to create, it's a royal pain
 in the ass to maintian.  This is because, by and large, no
-provision is made in the overlay system to account for the
-reality that upstream source code is often rapidly changing,
-as may also be code in an overlay, and these changes create
-a frequent need to merge or backport upstream changes into
-downstream overlay code.
+provision is made in the overlay framework to account for the
+reality that upstream and overlay source code are often rapidly
+evolving in tandem.
 
-overlay-upstream-tracking is a simple framework to allow
-Gentoo overlay maintainers to more rigorously specify the
-realtionships between code in an overlay and upstream code,
-i.e., typically code in the gentoo-x86 cvs repository.
+This makes it extremely difficult to keep track of when it is
+neccesary to backport upstream changes into the overlay
+code-base.  The primary goal of overlay-upstream-tracking is
+to turn this problem on it's head, leveraging the capabilities
+of the overlay's version-control system to make merging
+upstream changes into overlay code-bases a breeze whenever
+practically possible, or, at worst, only so hard as merging the
+actual code.
 
-From this, overlay-upstream-tracking constructs a "pseudo-overlay"
-repository which mirrors relevant portions of the upstream
-code-base into a version-control-friendly "proxy" repository,
-suitable for use by the overlay maintainer as a place from
-which to merge upstream changes.
-
-To make this possible, the basic idea is that the pseudo-overlay
-would contain upstream files renamed, if necessary, to the same
-names as files in the overlay.
-
-For now, this process is framed in git-specific terms and
-will not be of much help to non-git overlays.  However,
-I'll attempt to keep the git-specific portions of the code
-fairly modular and of minimal complexity, so that in the
-future, the same pseudo-overlay construction methods could
-be applied to subversion or perhaps even to non-version-controlled
-overlays by means of, i.e., quilt.
-
-Additional plumbing will be provided to set up and maintian
-these merging relationships in git repostiories in a mostly-automated
-and, otherwise, manageable way.
-
-The presumptive arrangment of information flows is thus
-(ascii art alert! -- monospace font recommended):
+Information flows thusly: (monospace font recommended):
 
 +->[ upstream ]
 |    |
@@ -61,20 +40,30 @@ The presumptive arrangment of information flows is thus
 |    v
 +-[[ for-upstream overlays ]]
 
-The for-upstream overlays (there may be several) are intended as
-a place to export deltas from the overlay in a format suitable for
-easy consumption by the upstream maintainer.  I doubt they will be
-maintained by overlay-upstream-tracking; instead tools will be
-provided to quickly "spit them out" on a one-off basis.  What to do with
-them, from there, would, I suppose, be up to the repository maintainer.
+The for-upstream overlays might not get implemented but my thinking
+is to make some way to export deltas from the overlay, in a format
+suitable for easy consumption by the upstream repo.  I doubt they would be
+maintained by overlay-upstream-tracking -- probably, they would just
+be spit out upon request and otherwise ignored.  The upstream-tracking
+pseudo-overlay is the proxy for upstream, and should be automatically
+maintained by overlay-upstream-tracking (see below).  "upstream," of couse,
+is simply the upstream repository -- presumably "gentoo-x86" or prefix.
 
 The process of generating and applying commits to the upstream-tracking
-pseudo-overlay will be automated according, to a set of default
-rules, or, at the overlay-maintainers option, to a set of overrides to
-those default rules, maintained in the upstream-tracking-metadata
-folder in the root of the overlay ${PORTDIR}.  The rules and the
-interface for customizing them are all open questions as of this writing.
+pseudo-overlay will be automated according to a set of highly flexible
+and configurable rules maintained at three levels: built-in, global, and
+overlay, in a crude-but-hopefuly-practical rules specification language.
 
-Sound nifty?  I thought so too but now I gotta implement the bloody thing...
+For now I'm looking to support git overlays only, but the Rules processing
+code shouldn't make any assumptions about the VCS.  Eventually it would
+hopefully be feasible to support multiple VCS or even non-version-controlled
+overlays, i.e., using quilt.
+
+Sound nifty?  I thought so too.  Just gotta implement it.  Drop me a line
+or a merge request if you have any thoughts or suggestions!
+
+enjoy,
 
 -gmt
+
+Greg Turner <gmt@be-evil.net>
