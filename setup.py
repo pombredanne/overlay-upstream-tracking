@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #    overlay-upstream-tracking: a Gentoo overlay maintenance toolkit
 #    Copyright (C) 2013  Gregory M. Turner <gmt@be-evil.net>
 #
