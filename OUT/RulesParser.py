@@ -333,7 +333,18 @@ class RulesParser(NewParser):
 
 	def p_string(self, p):
 		'string : OPENQUOTE creamyfilling CLOSEQUOTE'
-		p[0] = ( 'STRING', ) + p[2]
+		# we could just do p[0] = ( 'STRING', ) + p[2]; however, this will produce
+		# ugly contiguous STRINGLITERAL sub-clauses; detect these and merge them
+		quoteparts = []
+		lastquotepart = [ None ]
+		for quotepart in p[2]:
+			quotepart = list(quotepart)
+			if lastquotepart[0] == 'STRINGLITERAL' and quotepart[0] == 'STRINGLITERAL':
+				lastquotepart[1] += quotepart[1]
+			else:
+				lastquotepart = quotepart
+				quoteparts.append(lastquotepart)
+		p[0] = ( 'STRING', ) + tuple([tuple(i) for i in quoteparts])
 
 	def p_creamyfilling(self, p):
 		'''creamyfilling : creamyfilling stringpart
