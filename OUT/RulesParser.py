@@ -328,7 +328,10 @@ class RulesParser(NewParser):
 		p[0] = ( 'STRINGLITERAL', p[1] )
 
 	def p_error(self, p):
-		raise RulesSyntaxError("line %s: Syntax error: '%s'" % (p.lineno, p.value))
+		if p == None:
+			raise RulesSyntaxError("Syntax error: unexpected end of file")
+		else:
+			raise RulesSyntaxError("line %s: Syntax error: '%s'" % (p.lexer.lineno, p.value))
 
 # FIXME: move to some kind of documentation or manpage place & correct
 # innacuracies
