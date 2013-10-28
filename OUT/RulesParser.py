@@ -22,7 +22,7 @@ from importlib import import_module
 from inspect import isclass
 
 class RulesSyntaxError(Exception):
-	"""Thrown if errors are encountered parsing the rules files"""
+	'''Thrown if errors are encountered parsing the rules files'''
 
 class NewLexer(object, lex.Lexer):
 	'''Wraps the old-style lex.Lexer class as a new-style class.'''
@@ -58,14 +58,12 @@ class NewLexer(object, lex.Lexer):
 			return delattr(self._lexer, name)
 
 	def __str__(self):
-		return "<%s (with _lexer: %s)>" % (self.__class__.__name__, str(self._lexer))
+		return '<%s (with _lexer: %s)>' % (self.__class__.__name__, str(self._lexer))
 	def __repr__(self):
-		return "<%s (with _lexer: %s)>" % (self.__class__.__name__, repr(self._lexer))
+		return '<%s (with _lexer: %s)>' % (self.__class__.__name__, repr(self._lexer))
 
 class NewParser(object):
-	"""
-	Base class for a lexer/parser that has the rules defined as methods
-	"""
+	'''Base class for a lexer/parser that has the rules defined as methods'''
 	def __init__(self, lexer, **kw):
 		self.debug = kw.get('debug', 0)
 
@@ -80,8 +78,8 @@ class NewParser(object):
 
 		modname += '_' + self.__class__.__name__
 
-		self.debugfile = kw.get('debugfile', modname + ".dbg")
-		self.tabmodule = kw.get('tabmodule', modname + "_" + "parsetab")
+		self.debugfile = kw.get('debugfile', modname + '.dbg')
+		self.tabmodule = kw.get('tabmodule', modname + '_' + 'parsetab')
 
 		# Build the lexer (if passed a class for the lexer, instantiate it)
 		if isclass(lexer):
@@ -176,7 +174,7 @@ class NewParser(object):
 		return ()
 
 class Luthor(NewLexer):
-	"""NewLexer-based lexer for rules language"""
+	'''NewLexer-based lexer for rules language'''
 	reserved = {
 		'if': 'IF',
 		'else': 'ELSE',
@@ -231,8 +229,8 @@ class Luthor(NewLexer):
 	#
 	# Regex rules for simple tokens
 	#
-	t_ignore = " \t"
-	t_stringliteral_ignore = ""
+	t_ignore = ' \t'
+	t_stringliteral_ignore = ''
 	t_LPAREN = r'\('
 	t_RPAREN = r'\)'
 	t_LCURLY = r'{'
@@ -262,7 +260,7 @@ class Luthor(NewLexer):
 	# and escaped newlines (already excessive for our purposes).
 	def t_stringliteral_newline(self, t):
 		r'\n'
-		raise RulesSyntaxError("line %s: Illegal carraige return in string" % (t.lexer.lineno))
+		raise RulesSyntaxError('line %s: Illegal carraige return in string' % (t.lexer.lineno))
 
 	# http://stackoverflow.com/questions/2039140
 	def t_ID(self, t):
