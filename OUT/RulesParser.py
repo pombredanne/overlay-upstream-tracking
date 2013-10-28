@@ -68,13 +68,20 @@ class NewParser(object):
 	"""
 	def __init__(self, lexer, **kw):
 		self.debug = kw.get('debug', 0)
-		try:
-			modname = os.path.split(os.path.splitext(__file__)[0])[1] + "_" + self.__class__.__name__
-		except:
-			modname = "parser"+"_"+self.__class__.__name__
+
+		modname = self.__class__.__module__ or 'parser_' + self.__class__.__name__
+		if '.' in modname:
+			modname = os.path.splitext(modname)[1][1:]
+
+		# shouldn't happen but just in case this gets cut-pasted or refactored...
+		if modname == '__main__':
+			filename = sys.modules[self.__module__].__file__
+			modname = os.path.splitext(os.path.basename(filename))[0]
+
+		modname += '_' + self.__class__.__name__
+
 		self.debugfile = kw.get('debugfile', modname + ".dbg")
 		self.tabmodule = kw.get('tabmodule', modname + "_" + "parsetab")
-		#print self.debugfile, self.tabmodule
 
 		# Build the lexer (if passed a class for the lexer, instantiate it)
 		if isclass(lexer):
@@ -300,7 +307,12 @@ class RulesParser(NewParser):
 	def __init__(self, lexer=None, **kwargs):
 		if lexer == None:
 			lexer = Luthor
-		super(RulesParser, self).__init__(lexer, **kwargs)
+		if 'tabmodule' in kwargs:
+			tabmodule = kwargs['tabmodule']
+			del(kwargs['tabmodule'])
+		else:
+			tabmodule = 'RulesParser_parsetab'
+		super(RulesParser, self).__init__(lexer, tabmodule=tabmodule, **kwargs)
 
 	def p_rulesprogram(self, p):
 		'rulesprogram : statements'
