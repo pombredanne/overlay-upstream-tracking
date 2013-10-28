@@ -79,7 +79,7 @@ class NewParser(object):
 		modname += '_' + self.__class__.__name__
 
 		self.debugfile = kw.get('debugfile', modname + '.dbg')
-		self.tabmodule = kw.get('tabmodule', modname + '_' + 'parsetab')
+		self.tabmodule = kw.get('tabmodule', modname + '_parsetab')
 
 		# Build the lexer (if passed a class for the lexer, instantiate it)
 		if isclass(lexer):
