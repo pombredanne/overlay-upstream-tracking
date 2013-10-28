@@ -15,10 +15,10 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+import os, sys, re
 import ply.lex as lex
-import re
 import ply.yacc as yacc
-import os
+from importlib import import_module
 from inspect import isclass
 
 class RulesSyntaxError(Exception):
@@ -98,6 +98,18 @@ class NewParser(object):
 			)
 		else:
 			self._lexer = lexer
+
+		# check if we can find a module correspondig to tabmodule in the module containing our class'
+		# module; if so, use that in preference to whatever yacc's choice would be
+		if isinstance(self.tabmodule, basestring):
+			classmodname = self.__class__.__module__ or None
+			if classmodname != None and classmodname != '__main__' and ('.' in classmodname):
+				tabmodule_modulename = os.path.splitext(classmodname)[0] + '.' + self.tabmodule
+				try:
+					mod = sys.modules[classmodname]
+					self.tabmodule = import_module(tabmodule_modulename, mod.__package__)
+				except ImportError:
+					pass
 
 		self._parser = yacc.yacc(
 			module=self,
