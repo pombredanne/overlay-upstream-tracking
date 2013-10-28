@@ -87,10 +87,14 @@ class NewParser(object):
 		if isclass(lexer):
 			self._lexer = lexer(
 				debug=self.debug,
-				**dict(filter(lambda(x): x in [
-					'optimize', 'debuglog', 'outputdir',
-					'errorlog', 'reflags', 'lextab', 'nowarn'
-				], kw))
+				**dict([
+					(key, kw[key]) for key in
+						filter(
+							lambda(x): x in [
+								'optimize', 'debuglog', 'outputdir',
+								'errorlog', 'reflags', 'lextab', 'nowarn'
+							], kw)
+				])
 			)
 		else:
 			self._lexer = lexer
@@ -100,10 +104,14 @@ class NewParser(object):
 			debug=self.debug,
 			debugfile=self.debugfile,
 			tabmodule=self.tabmodule,
-			**dict(filter(lambda(x): x in [
-				'method', 'start', 'check_recursion', 'optimize', 'write_tables',
-				'outputdir', 'debuglog', 'errorlog', 'picklefile'
-			], kw))
+			**dict([
+				(key, kw[key]) for key in
+					filter(
+						lambda(x): x in [
+							'method', 'start', 'check_recursion', 'optimize', 'write_tables',
+							'outputdir', 'debuglog', 'errorlog', 'picklefile'
+						], kw)
+			])
 		)
 
 	def parse(self, data, **kw):
