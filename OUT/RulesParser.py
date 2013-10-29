@@ -59,7 +59,7 @@ class NewLexer(object, lex.Lexer):
 		if 'optimize' in kwargs:
 			_optimize = kwargs['optimize']
 		else:
-			optimize = 0
+			_optimize = 0
 
 		# check if we can find a module correspondig to lextab in the module containing our class'
 		# module; if so, use that in preference to whatever lex's choice would be
