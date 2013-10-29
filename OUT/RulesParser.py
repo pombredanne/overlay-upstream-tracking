@@ -115,9 +115,16 @@ class NewLexer(object, lex.Lexer):
 			return delattr(self._lexer, name)
 
 	def __str__(self):
-		return '<%s (with _lexer: %s)>' % (self.__class__.__name__, str(self._lexer))
+		if hasattr(self, '_lexer'):
+			return '<%s (with _lexer: %s)>' % (self.__class__.__name__, str(self._lexer))
+		else:
+			return '<%s (probably initializing; no _lexer yet)>' % self.__class__.__name__
+
 	def __repr__(self):
-		return '<%s (with _lexer: %s)>' % (self.__class__.__name__, repr(self._lexer))
+		if hasattr(self, '_lexer'):
+			return '<%s (with _lexer: %s)>' % (self.__class__.__name__, repr(self._lexer))
+		else:
+			return '<%s (probably initializing; no _lexer yet)>' % self.__class__.__name__
 
 # Ideally this would descend from (object, LRParser).
 # However, I think it is simply too complicated to be worth it.
