@@ -75,9 +75,7 @@ class NewLexer(object, lex.Lexer):
 					# optimize=1 in that circumstance, but only if we sucecssfully loaded a module here.
 					# This way, a "surprise" lextab the user didn't ask for will never be generated, but
 					# at the same time, we will not fail due to -OO when a perfectly usable lextab was
-					# sitting there waiting to be requested.  Note the asymmetry with Parser.  This is
-					# because yacc will heed the parsetab regardless of the optimization mode requested,
-					# whereas lex, awkwardly, will only import a lextab if optimize mode is requested.
+					# sitting there waiting to be requested.
 					if sys.flags.optimize > 1:
 						_optimize = 1
 
@@ -150,6 +148,7 @@ class NewParser(object):
 		self.tabmodule = kwargs.get('tabmodule', modname + '_parsetab')
 
 		self.lex_optimize = kwargs.get('lex_optimize', 0) or kwargs.get('optimize', 0)
+		self.yacc_optimize = kwargs.get('optimize', 0)
 
 		# Build the lexer (if passed a class for the lexer, instantiate it)
 		if isclass(lexer_arg):
@@ -172,18 +171,27 @@ class NewParser(object):
 				try:
 					mod = sys.modules[classmodname]
 					self.tabmodule = import_module(tabmodule_modulename, mod.__package__)
+
+					# The parser will break if python is in -OO mode or greater; force
+					# optimize=1 in that circumstance, but only if we sucecssfully loaded a module here.
+					# This way, a "surprise" parsetab the user didn't ask for will never be generated, but
+					# at the same time, we will not fail due to -OO when a perfectly usable parsetab was
+					# sitting there waiting to be requested.
+					if sys.flags.optimize > 1:
+						self.yacc_optimize = 1
 				except ImportError:
 					pass
 
 		kwargs = kwargs.copy()
 		for arg in kwargs.keys():
-			if not arg in [ 'method', 'start', 'check_recursion', 'optimize', 'write_tables',
+			if not arg in [ 'method', 'start', 'check_recursion', 'write_tables',
 					'outputdir', 'debuglog', 'errorlog', 'picklefile' ]:
 				del(kwargs[arg])
 		kwargs['module'] = self
 		kwargs['debug'] = self.debug
 		kwargs['debugfile'] = self.debugfile
 		kwargs['tabmodule'] = self.tabmodule
+		kwargs['optimize'] = self.yacc_optimize
 		self._parser = yacc.yacc(**kwargs)
 
 	def parse(self, data, **kwargs):
