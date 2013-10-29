@@ -28,8 +28,13 @@ class NewLexer(object, lex.Lexer):
 	'''Wraps the old-style lex.Lexer class as a new-style class.'''
 
 	def __new__(cls, **kwargs):
+		kwargs = kwargs.copy()
 		obj = object.__new__(cls)
-		obj._lexer = lex.lex(module=obj, **kwargs)
+
+		if 'module' not in kwargs:
+			kwargs['module'] = obj
+
+		obj._lexer = lex.lex(**kwargs)
 		return obj
 
 	def __getattr__(self, name):
@@ -62,16 +67,20 @@ class NewLexer(object, lex.Lexer):
 	def __repr__(self):
 		return '<%s (with _lexer: %s)>' % (self.__class__.__name__, repr(self._lexer))
 
+# Ideally this would descend from (object, LRParser).
+# However, I think it is simply too complicated to be worth it.
+# Frankly, it was probably too complicated to be worth it for
+# the lexer as well.  Instead, we just implement the same
+# interface and assume this will suffice.  Maybe fix later.
 class NewParser(object):
 	'''Base class for a lexer/parser that has the rules defined as methods'''
-	def __init__(self, lexer, **kwargs):
+	def __init__(self, lexer_arg, **kwargs):
 		self.debug = kwargs.get('debug', 0)
 
 		modname = self.__class__.__module__ or 'parser_' + self.__class__.__name__
 		if '.' in modname:
 			modname = os.path.splitext(modname)[1][1:]
 
-		# shouldn't happen but just in case this gets cut-pasted or refactored...
 		if modname == '__main__':
 			filename = sys.modules[self.__module__].__file__
 			modname = os.path.splitext(os.path.basename(filename))[0]
@@ -81,21 +90,19 @@ class NewParser(object):
 		self.debugfile = kwargs.get('debugfile', modname + '.dbg')
 		self.tabmodule = kwargs.get('tabmodule', modname + '_parsetab')
 
+		self.lex_optimize = kwargs.get('lex_optimize', 0) or kwargs.get('optimize', 0)
+
 		# Build the lexer (if passed a class for the lexer, instantiate it)
-		if isclass(lexer):
-			self._lexer = lexer(
-				debug=self.debug,
-				**dict([
-					(key, kwargs[key]) for key in
-						filter(
-							lambda(x): x in [
-								'optimize', 'debuglog', 'outputdir',
-								'errorlog', 'reflags', 'lextab', 'nowarn'
-							], kwargs)
-				])
-			)
+		if isclass(lexer_arg):
+			lexer_kwargs = kwargs.copy()
+			for arg in kwargs.keys():
+				if not arg in ['debuglog', 'outputdir', 'errorlog', 'reflags', 'lextab', 'nowarn']:
+					del(lexer_kwargs[arg])
+			lexer_kwargs['debug'] = self.debug
+			lexer_kwargs['optimize'] = self.lex_optimize
+			self._lexer = lexer_arg(**lexer_kwargs)
 		else:
-			self._lexer = lexer
+			self._lexer = lexer_arg
 
 		# check if we can find a module correspondig to tabmodule in the module containing our class'
 		# module; if so, use that in preference to whatever yacc's choice would be
@@ -109,52 +116,39 @@ class NewParser(object):
 				except ImportError:
 					pass
 
-		self._parser = yacc.yacc(
-			module=self,
-			debug=self.debug,
-			debugfile=self.debugfile,
-			tabmodule=self.tabmodule,
-			**dict([
-				(key, kwargs[key]) for key in
-					filter(
-						lambda(x): x in [
-							'method', 'start', 'check_recursion', 'optimize', 'write_tables',
-							'outputdir', 'debuglog', 'errorlog', 'picklefile'
-						], kwargs)
-			])
-		)
+		kwargs = kwargs.copy()
+		for arg in kwargs.keys():
+			if not arg in [ 'method', 'start', 'check_recursion', 'optimize', 'write_tables',
+					'outputdir', 'debuglog', 'errorlog', 'picklefile' ]:
+				del(kwargs[arg])
+		kwargs['module'] = self
+		kwargs['debug'] = self.debug
+		kwargs['debugfile'] = self.debugfile
+		kwargs['tabmodule'] = self.tabmodule
+		self._parser = yacc.yacc(**kwargs)
 
 	def parse(self, data, **kwargs):
-		if 'lexer' in kwargs:
-			lexer = kwargs['lexer']
-			del(kwargs['lexer'])
-		else:
-			lexer = self._lexer
-		return self._parser.parse(data, lexer=lexer, **kwargs)
+		if not 'lexer' in kwargs:
+			kwargs['lexer'] = self._lexer
+		return self._parser.parse(data, **kwargs)
 
 	def parsedebug(self, data, **kwargs):
-		if 'lexer' in kwargs:
-			lexer = kwargs['lexer']
-			del(kwargs['lexer'])
-		else:
-			lexer = self._lexer
-		return self._parser.parsedebug(data, lexer=lexer, **kwargs)
+		if not 'lexer' in kwargs:
+			kwargs = kwargs.copy()
+			kwargs['lexer'] = self._lexer
+		return self._parser.parsedebug(data, **kwargs)
 
 	def parseopt(self, data, **kwargs):
-		if 'lexer' in kwargs:
-			lexer = kwargs['lexer']
-			del(kwargs['lexer'])
-		else:
-			lexer = self._lexer
-		return self._parser.parseopt(data, lexer=lexer, **kwargs)
+		if not 'lexer' in kwargs:
+			kwargs = kwargs.copy()
+			kwargs['lexer'] = self._lexer
+		return self._parser.parseopt(data, **kwargs)
 
 	def parseopt_notrack(self, data, **kwargs):
-		if 'lexer' in kwargs:
-			lexer = kwargs['lexer']
-			del(kwargs['lexer'])
-		else:
-			lexer = self._lexer
-		return self._parser.parseopt_notrack(data, lexer=lexer, **kwargs)
+		if not 'lexer' in kwargs:
+			kwargs = kwargs.copy()
+			kwargs['lexer'] = self._lexer
+		return self._parser.parseopt_notrack(data, **kwargs)
 
 	def restart(self):
 		self._parser.restart()
@@ -325,12 +319,10 @@ class RulesParser(NewParser):
 	def __init__(self, lexer=None, **kwargs):
 		if lexer == None:
 			lexer = Luthor
-		if 'tabmodule' in kwargs:
-			tabmodule = kwargs['tabmodule']
-			del(kwargs['tabmodule'])
-		else:
-			tabmodule = 'RulesParser_parsetab'
-		super(RulesParser, self).__init__(lexer, tabmodule=tabmodule, **kwargs)
+		if not 'tabmodule' in kwargs:
+			kwargs = kwargs.copy()
+			kwargs['tabmodule'] = 'RulesParser_parsetab'
+		super(RulesParser, self).__init__(lexer, **kwargs)
 
 	def p_rulesprogram(self, p):
 		'rulesprogram : statements'
