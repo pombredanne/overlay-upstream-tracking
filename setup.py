@@ -35,8 +35,11 @@ SETUP_PY_DIR = os.path.realpath(
 )
 OUT_DIR = os.path.join(SETUP_PY_DIR, 'OUT')
 RULESPARSER_PARSETAB = 'RulesParser_parsetab'
+RULESPARSER_LEXTAB = 'RulesParser_lextab'
 RULESPARSER_PARSETAB_PY_FULLPATH = os.path.join(OUT_DIR, RULESPARSER_PARSETAB + '.py')
 RULESPARSER_PARSETAB_PYC_FULLPATH = os.path.join(OUT_DIR, RULESPARSER_PARSETAB + '.pyc')
+RULESPARSER_LEXTAB_PY_FULLPATH = os.path.join(OUT_DIR, RULESPARSER_LEXTAB + '.py')
+RULESPARSER_LEXTAB_PYC_FULLPATH = os.path.join(OUT_DIR, RULESPARSER_LEXTAB + '.pyc')
 # presumably there is no need for a PARSETAB_PYO_FILEPATH
 
 class build_parsetabs(Command):
@@ -54,18 +57,22 @@ class build_parsetabs(Command):
 		if sys.flags.optimize > 1:
 			raise Exception("'double'-optimized execution is not supported by build_parsetabs.  Please run with, at most, -O")
 
-		log.info("building OUT/RulesParser_parsetab.py from OUT.RulesParser")
+		log.info("building OUT/RulesParser_{parse,lex}tab.py{,c} from OUT.RulesParser")
 		if os.path.exists(OUT_DIR) and os.path.exists(os.path.join(OUT_DIR, '__init__.py')) and not self.dry_run:
 			pythonpath = sys.path or ''
 			try:
 				sys.path.insert(0, SETUP_PY_DIR)
 				from OUT.RulesParser import RulesParser as _OUT_RulesParser
-				O_RP = _OUT_RulesParser(outputdir=OUT_DIR)
+				O_RP = _OUT_RulesParser(outputdir=OUT_DIR, lex_optimize=1)
 
 				# instantiating it should have generated the parsetab
 				if not os.path.exists(RULESPARSER_PARSETAB_PY_FULLPATH):
-					log.warn("Failed to generate file '%s'.  Ignoring, but something ain't right" %
+					log.warn("Failed to generate file '%s' (ignoring, but something ain't right)" %
 							RULESPARSER_PARSETAB_PY_FULLPATH)
+				if not os.path.exists(RULESPARSER_LEXTAB_PY_FULLPATH):
+					log.warn("Failed to generate file '%s' (ignoring, but something ain't right)" %
+							RULESPARSER_LEXTAB_PY_FULLPATH)
+
 			finally:
 				del(sys.path[0])
 
@@ -81,7 +88,8 @@ class clean(_clean):
 	"""Cleans out parsetabs in addition to whatever else goes on in distutils.command.clean"""
 	def run(self):
 		_clean.run(self)
-		for parsetab_fullpath in [RULESPARSER_PARSETAB_PY_FULLPATH, RULESPARSER_PARSETAB_PYC_FULLPATH]:
+		for parsetab_fullpath in [ RULESPARSER_PARSETAB_PY_FULLPATH, RULESPARSER_PARSETAB_PYC_FULLPATH,
+					   RULESPARSER_LEXTAB_PY_FULLPATH, RULESPARSER_LEXTAB_PYC_FULLPATH ]:
 			if os.path.exists(parsetab_fullpath):
 				log.info("Generated file '%s' present -- removing." % parsetab_fullpath)
 				# go ahead and let any OSError flow through -- we just verified it exists so if we
