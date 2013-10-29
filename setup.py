@@ -63,7 +63,7 @@ class build_parsetabs(Command):
 			try:
 				sys.path.insert(0, SETUP_PY_DIR)
 				from OUT.RulesParser import RulesParser as _OUT_RulesParser
-				O_RP = _OUT_RulesParser(outputdir=OUT_DIR, lex_optimize=1)
+				O_RP = _OUT_RulesParser(outputdir=OUT_DIR, optimize=1)
 
 				# instantiating it should have generated the parsetab
 				if not os.path.exists(RULESPARSER_PARSETAB_PY_FULLPATH):
