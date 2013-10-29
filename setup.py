@@ -51,6 +51,9 @@ class build_parsetabs(Command):
 
 	def run(self):
 		"""build the parsetabs"""
+		if sys.flags.optimize > 1:
+			raise Exception("'double'-optimized execution is not supported by build_parsetabs.  Please run with, at most, -O")
+
 		log.info("building OUT/RulesParser_parsetab.py from OUT.RulesParser")
 		if os.path.exists(OUT_DIR) and os.path.exists(os.path.join(OUT_DIR, '__init__.py')) and not self.dry_run:
 			pythonpath = sys.path or ''
