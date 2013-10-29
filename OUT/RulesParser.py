@@ -76,7 +76,7 @@ class NewLexer(object, lex.Lexer):
 					# This way, a "surprise" lextab the user didn't ask for will never be generated, but
 					# at the same time, we will not fail due to -OO when a perfectly usable lextab was
 					# sitting there waiting to be requested.
-					if sys.flags.optimize > 1:
+					if sys.flags.optimize > 0:
 						_optimize = 1
 
 				except ImportError:
@@ -177,7 +177,7 @@ class NewParser(object):
 					# This way, a "surprise" parsetab the user didn't ask for will never be generated, but
 					# at the same time, we will not fail due to -OO when a perfectly usable parsetab was
 					# sitting there waiting to be requested.
-					if sys.flags.optimize > 1:
+					if sys.flags.optimize > 0:
 						self.yacc_optimize = 1
 				except ImportError:
 					pass
