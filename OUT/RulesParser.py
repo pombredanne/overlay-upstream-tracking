@@ -34,12 +34,64 @@ class NewLexer(object, lex.Lexer):
 		if 'module' not in kwargs:
 			kwargs['module'] = obj
 
-		obj._lexer = lex.lex(**kwargs)
+		obj._lexer = cls.lex_new(**kwargs)
 		return obj
+
+	@classmethod
+	def lex_new(cls, **kwargs):
+		'''Handle lextab creation/naming during __new__'''
+		kwargs = kwargs.copy()
+		modname = cls.__module__ or 'lexer_' + cls.__name__
+		if '.' in modname:
+			modname = os.path.splitext(modname)[1][1:]
+
+		if modname == '__main__':
+			filename = sys.modules['__main__'].__file__
+			modname = os.path.splitext(os.path.basename(filename))[0]
+
+		modname += '_' + cls.__name__
+
+		if 'lextab' in kwargs:
+			_lextab = kwargs['lextab']
+		else:
+			_lextab = modname + '_lextab'
+
+		if 'optimize' in kwargs:
+			_optimize = kwargs['optimize']
+		else:
+			optimize = 0
+
+		# check if we can find a module correspondig to lextab in the module containing our class'
+		# module; if so, use that in preference to whatever lex's choice would be
+		if isinstance(_lextab, basestring):
+			classmodname = cls.__module__ or None
+			if classmodname != None and classmodname != '__main__' and ('.' in classmodname):
+				lextab_modulename = os.path.splitext(classmodname)[0] + '.' + _lextab
+				try:
+					mod = sys.modules[classmodname]
+					_lextab = import_module(lextab_modulename, mod.__package__)
+
+					# Because the lexer will break if python is in -OO mode or greater, force
+					# optimize=1 in that circumstance, but only if we sucecssfully loaded a module here.
+					# This way, a "surprise" lextab the user didn't ask for will never be generated, but
+					# at the same time, we will not fail due to -OO when a perfectly usable lextab was
+					# sitting there waiting to be requested.  Note the asymmetry with Parser.  This is
+					# because yacc will heed the parsetab regardless of the optimization mode requested,
+					# whereas lex, awkwardly, will only import a lextab if optimize mode is requested.
+					if sys.flags.optimize > 1:
+						_optimize = 1
+
+				except ImportError:
+					pass
+
+		kwargs['lextab'] = _lextab
+		kwargs['optimize'] = _optimize
+		return lex.lex(**kwargs)
 
 	def __getattr__(self, name):
 		# ensure no crazy recursion issues
-		if name in ('__dict__', '__new__', '_lexer', '__getattr__', '__setattr__', '__delattr__', '__str__', '__repr__'):
+		if name in [ '__dict__', '__new__', '__del__', '_lexer', '__getattr__', '__setattr__',
+			     '__delattr__', '__str__', '__repr__', '__module__', '__name__' ]:
 			return self.__dict__[name]
 
 		try:
@@ -169,6 +221,12 @@ class NewParser(object):
 
 class Luthor(NewLexer):
 	'''NewLexer-based lexer for rules language'''
+	def __new__(cls, **kwargs):
+		kwargs = kwargs.copy()
+		if not 'lextab' in kwargs:
+			kwargs['lextab'] = 'RulesParser_lextab'
+		return NewLexer.__new__(cls, **kwargs)
+
 	reserved = {
 		'if': 'IF',
 		'else': 'ELSE',
