@@ -64,8 +64,8 @@ class NewLexer(object, lex.Lexer):
 
 class NewParser(object):
 	'''Base class for a lexer/parser that has the rules defined as methods'''
-	def __init__(self, lexer, **kw):
-		self.debug = kw.get('debug', 0)
+	def __init__(self, lexer, **kwargs):
+		self.debug = kwargs.get('debug', 0)
 
 		modname = self.__class__.__module__ or 'parser_' + self.__class__.__name__
 		if '.' in modname:
@@ -78,20 +78,20 @@ class NewParser(object):
 
 		modname += '_' + self.__class__.__name__
 
-		self.debugfile = kw.get('debugfile', modname + '.dbg')
-		self.tabmodule = kw.get('tabmodule', modname + '_parsetab')
+		self.debugfile = kwargs.get('debugfile', modname + '.dbg')
+		self.tabmodule = kwargs.get('tabmodule', modname + '_parsetab')
 
 		# Build the lexer (if passed a class for the lexer, instantiate it)
 		if isclass(lexer):
 			self._lexer = lexer(
 				debug=self.debug,
 				**dict([
-					(key, kw[key]) for key in
+					(key, kwargs[key]) for key in
 						filter(
 							lambda(x): x in [
 								'optimize', 'debuglog', 'outputdir',
 								'errorlog', 'reflags', 'lextab', 'nowarn'
-							], kw)
+							], kwargs)
 				])
 			)
 		else:
@@ -115,46 +115,46 @@ class NewParser(object):
 			debugfile=self.debugfile,
 			tabmodule=self.tabmodule,
 			**dict([
-				(key, kw[key]) for key in
+				(key, kwargs[key]) for key in
 					filter(
 						lambda(x): x in [
 							'method', 'start', 'check_recursion', 'optimize', 'write_tables',
 							'outputdir', 'debuglog', 'errorlog', 'picklefile'
-						], kw)
+						], kwargs)
 			])
 		)
 
-	def parse(self, data, **kw):
-		if 'lexer' in kw:
-			lexer = kw['lexer']
-			del(kw['lexer'])
+	def parse(self, data, **kwargs):
+		if 'lexer' in kwargs:
+			lexer = kwargs['lexer']
+			del(kwargs['lexer'])
 		else:
 			lexer = self._lexer
-		return self._parser.parse(data, lexer=lexer, **kw)
+		return self._parser.parse(data, lexer=lexer, **kwargs)
 
-	def parsedebug(self, data, **kw):
-		if 'lexer' in kw:
-			lexer = kw['lexer']
-			del(kw['lexer'])
+	def parsedebug(self, data, **kwargs):
+		if 'lexer' in kwargs:
+			lexer = kwargs['lexer']
+			del(kwargs['lexer'])
 		else:
 			lexer = self._lexer
-		return self._parser.parsedebug(data, lexer=lexer, **kw)
+		return self._parser.parsedebug(data, lexer=lexer, **kwargs)
 
-	def parseopt(self, data, **kw):
-		if 'lexer' in kw:
-			lexer = kw['lexer']
-			del(kw['lexer'])
+	def parseopt(self, data, **kwargs):
+		if 'lexer' in kwargs:
+			lexer = kwargs['lexer']
+			del(kwargs['lexer'])
 		else:
 			lexer = self._lexer
-		return self._parser.parseopt(data, lexer=lexer, **kw)
+		return self._parser.parseopt(data, lexer=lexer, **kwargs)
 
-	def parseopt_notrack(self, data, **kw):
-		if 'lexer' in kw:
-			lexer = kw['lexer']
-			del(kw['lexer'])
+	def parseopt_notrack(self, data, **kwargs):
+		if 'lexer' in kwargs:
+			lexer = kwargs['lexer']
+			del(kwargs['lexer'])
 		else:
 			lexer = self._lexer
-		return self._parser.parseopt_notrack(data, lexer=lexer, **kw)
+		return self._parser.parseopt_notrack(data, lexer=lexer, **kwargs)
 
 	def restart(self):
 		self._parser.restart()
