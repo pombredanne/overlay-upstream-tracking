@@ -23,8 +23,8 @@ class RulesSyntaxError(Exception):
 class Luthor(OOLexer):
 	'''NewLexer-based lexer for rules language'''
 	def __new__(cls, **kwargs):
-		kwargs = kwargs.copy()
 		if not 'lextab' in kwargs:
+			kwargs = kwargs.copy()
 			kwargs['lextab'] = 'RulesParser_lextab'
 		return OOLexer.__new__(cls, **kwargs)
 
