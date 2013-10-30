@@ -64,7 +64,6 @@ class Luthor(OOLexer):
 		'GE',
 		'LE',
 		'SEMICOLON',
-		'COMMENT',
 		'OPENQUOTE',
 		'CLOSEQUOTE',
 		'VARIABLESUBSTITUTION',
