@@ -49,6 +49,8 @@ class Luthor(OOLexer):
 		'pass': 'PASS',
 		'update': 'UPDATE',
 		'upgrade_overlay': 'UPGRADEOVERLAY',
+		'true': 'TRUE',
+		'false': 'FALSE',
 	}
 	tokens = [
 		'LPAREN',
@@ -58,6 +60,7 @@ class Luthor(OOLexer):
 		'COLONEQUALS',
 		'PLUSPLUSPLUS',
 		'EQUALSEQUALS',
+		'BANG',
 		'BANGEQUALS',
 		'TILDEEQUALS',
 		'GT',
@@ -91,6 +94,7 @@ class Luthor(OOLexer):
 	t_COLONEQUALS = r':='
 	t_PLUSPLUSPLUS = r'\+\+\+'
 	t_EQUALSEQUALS = r'=='
+	t_BANG = r'!'
 	t_BANGEQUALS = r'!='
 	t_TILDEEQUALS = r'~='
 	t_GT = r'>'
@@ -201,7 +205,8 @@ class RulesParser(OOParser):
 		pass
 
 	def p_statement(self, p):
-		'statement : assignment SEMICOLON'
+		'''statement : assignment SEMICOLON
+		             | ifstmt SEMICOLON'''
 		p[0] = p[1]
 
 	def p_assignment(self, p):
@@ -255,6 +260,27 @@ class RulesParser(OOParser):
 	def p_literal(self, p):
 		'literal : STRINGLITERALTEXT'
 		p[0] = ( 'STRINGLITERAL', p[1] )
+
+	def p_ifstmt(self, p):
+		'''ifstmt : IF boolean LCURLY statements RCURLY optionalifclauses'''
+		p[0] = ( 'IF', 'FIXME' )
+
+	def p_optionalifclauses(self, p):
+		'''optionalifclauses : ELIF boolean LCURLY statements RCURLY optionalifclauses
+		                     | ELSE LCURLY statements RCURLY
+				     | empty'''
+		p[0] = 'FIXME'
+
+	def p_boolean(self, p):
+		'''boolean : LPAREN leanboolean RPAREN'''
+		p[0] = ( 'BOOLEAN' ,) + p[2]
+
+	def p_leanboolean(self, p):
+		'''leanboolean : TRUE
+		               | FALSE
+			       | BANG boolean
+			       | BANG leanboolean'''
+		p[0] = ( 'FIXME' ,)
 
 	def p_error(self, p):
 		if p == None:
