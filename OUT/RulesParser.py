@@ -257,7 +257,7 @@ class RulesParser(OOParser):
 
 	def p_error(self, p):
 		if p == None:
-			raise RulesSyntaxError("Syntax error: unexpected end of file")
+			raise RulesSyntaxError("Syntax error: unexpected end of file (missing semicolon?)")
 		else:
 			raise RulesSyntaxError("line %s: Syntax error: '%s'" % (p.lexer.lineno, p.value))
 
