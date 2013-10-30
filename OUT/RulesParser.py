@@ -263,13 +263,21 @@ class RulesParser(OOParser):
 
 	def p_ifstmt(self, p):
 		'''ifstmt : IF boolean LCURLY statements RCURLY optionalifclauses'''
-		p[0] = ( 'IF', 'FIXME' )
+		p[0] = ( 'IF', p[2], ( 'THEN', ) + p[4] ) + p[6]
 
 	def p_optionalifclauses(self, p):
 		'''optionalifclauses : ELIF boolean LCURLY statements RCURLY optionalifclauses
 		                     | ELSE LCURLY statements RCURLY
 				     | empty'''
-		p[0] = 'FIXME'
+		if len(p) == 7:
+			p[0] = ( ( 'ELSE', ( 'IF', p[2], ( 'THEN', ) + p[4] ) + p[6] ), )
+		elif len(p) == 5:
+			p[0] = ( ( 'ELSE' ,) + p[3], )
+		elif len(p) == 2:
+			p[0] = ()
+		else:
+			raise RulesSyntaxError("line %s: Internal error: unexpected optionalifclauses production length %s" % (
+				p.lexer.lineno, len(p)))
 
 	def p_boolean(self, p):
 		'''boolean : LPAREN leanboolean RPAREN'''
@@ -278,9 +286,28 @@ class RulesParser(OOParser):
 	def p_leanboolean(self, p):
 		'''leanboolean : TRUE
 		               | FALSE
-			       | BANG boolean
-			       | BANG leanboolean'''
-		p[0] = ( 'FIXME' ,)
+			       | BANG leanboolean
+			       | LPAREN leanboolean RPAREN'''
+		# True/False
+		if len(p) == 2:
+			p[0] = ( p[1], )
+		# ! <leanboolean>; optimize ( 'NOT', ('BOOLEAN', 'true|false' ) )
+		elif len(p) == 3:
+			if p[2] == ( 'true', ):
+				p[0] = ( 'false', )
+			elif p[2] == ( 'false', ):
+				p[0] = ( 'true', )
+			else:
+				p[0] = ( 'NOT', ( 'BOOLEAN', ) + p[2] )
+		# ( <leanboolean> )
+		elif len(p) == 4:
+			# just ignore the parenthesis, since this will become an unambiguous
+			# ( 'BOOLEAN', <whatever> ) construct in all contexts where this production
+			# is selected by the parser.
+			p[0] = p[2]
+		else:
+			raise RulesSyntaxError("line %s: Internal error: unexpected leanboolean production length %s" % (
+				p.lexer.lineno, len(p)))
 
 	def p_error(self, p):
 		if p == None:
