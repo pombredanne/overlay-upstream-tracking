@@ -396,10 +396,10 @@ class RulesParser(OOParser):
 			'==': 'EQUAL',
 			'!=': 'NOT-EQUAL',
 			'=~': 'MATCH-REGEX',
-			'GT': 'GREATER',
-			'LT': 'LESS',
-			'GE': 'GREATER-EQUAL',
-			'LE': 'LESS-EQUAL',
+			'>': 'GREATER',
+			'<': 'LESS',
+			'>=': 'GREATER-EQUAL',
+			'<=': 'LESS-EQUAL',
 		}[p[1]]
 
 	def p_error(self, p):
