@@ -329,7 +329,8 @@ class RulesParser(OOParser):
 			# ( 'BOOLEAN', <whatever> ) construct in all contexts where this production
 			# is selected by the parser.
 			p[0] = p[2]
-		# leanboolean and|or leanboolean / value compop value
+
+		# leanboolean AND|OR leanboolean / value compop value
 		elif  len(p) == 4:
 			# optimize away silly shit like: ( 'OR' ( 'BOOLEAN' 'true' ) ('BOOLEAN' 'false' ))
 			p[0] = 'unset'
@@ -345,7 +346,6 @@ class RulesParser(OOParser):
 				# XYZ || false ==> XYZ
 				elif p[3]  == ( 'false', ):
 					p[0] = p[1]
-				# TODO: foo || bar || baz ==> ('OR' foo bar baz); since we left-bind, ...
 			elif p[2] == '&&':
 				logop = 'AND'
 				if p[1] == ( 'false', ):
@@ -358,13 +358,28 @@ class RulesParser(OOParser):
 				# XYZ && true ==> XYZ
 				elif p[3] == ( 'false', ):
 					p[0] = p[1]
-				# TODO: foo && bar && baz ==> ('AND' foo bar baz); since we left-bind, ...
+
 			# <value> compop <value>
 			else:
-				# optimizing away comparison-of-constants here is pretty hard, not worth it.
+				# optimizing away comparison-of-constants here is pretty hard / error-prone
+				# plus, it will probably never come up in practice -- in short, it's not worth it.
 				p[0] = ( ( p[2], p[1], p[3] ), )
+
+			# non-optimized (so far) boolean logical operators: flatten nested same-logical-operator trees
 			if p[0] == 'unset':
-				p[0] = ( ( logop, ( 'BOOLEAN', ) + p[1], ( 'BOOLEAN', ) + p[3] ), )
+				# a few more optimizations we can try (comments assume logop == 'OR' but 'AND' treated identically)
+				# (foo || bar) || (baz || quux) ==> ('OR' foo bar baz quux)
+				if len(p[1][0]) >= 2 and p[1][0][0] == logop and len(p[3][0]) >= 2 and p[3][0][0] == logop:
+					p[0] = ( ( logop, ) + p[1][0][1:] + p[3][0][1:], )
+				# foo || (bar || baz) ==> ('OR' foo bar baz)
+				elif len(p[3][0]) >= 2 and p[3][0][0] == logop:
+					p[0] = ( ( logop, ( 'BOOLEAN', ) + p[1] ) + p[3][0][1:], )
+				# foo || bar || baz ==> ('OR' foo bar baz)
+				elif len(p[1][0]) >= 2 and p[1][0][0] == logop:
+					p[0] = ( ( logop, ) + p[1][0][1:] + ( ( 'BOOLEAN', ) + p[3], ), )
+				# non-optimizable boolean logical operator production:
+				else:
+					p[0] = ( ( logop, ( 'BOOLEAN', ) + p[1], ( 'BOOLEAN', ) + p[3] ), )
 		else:
 			raise RulesSyntaxError("line %s: Internal error: unexpected leanboolean production length %s" % (
 				p.lexer.lineno, len(p)))
