@@ -299,6 +299,7 @@ class RulesParser(OOParser):
 		               | FALSE
 			       | BANG leanboolean
 			       | LPAREN leanboolean RPAREN
+			       | value compop value
 			       | leanboolean OR leanboolean
 			       | leanboolean AND leanboolean'''
 		# True/False
@@ -328,7 +329,7 @@ class RulesParser(OOParser):
 			# ( 'BOOLEAN', <whatever> ) construct in all contexts where this production
 			# is selected by the parser.
 			p[0] = p[2]
-		# leanboolean and|or leanboolean
+		# leanboolean and|or leanboolean / value compop value
 		elif  len(p) == 4:
 			# optimize away silly shit like: ( 'OR' ( 'BOOLEAN' 'true' ) ('BOOLEAN' 'false' ))
 			p[0] = 'unset'
@@ -358,14 +359,33 @@ class RulesParser(OOParser):
 				elif p[3] == ( 'false', ):
 					p[0] = p[1]
 				# TODO: foo && bar && baz ==> ('AND' foo bar baz); since we left-bind, ...
+			# <value> compop <value>
 			else:
-				raise RulesSyntaxError("line %s: Internal error: unexpected logop %s" % (
-					p.lexer.lineno, len(p)))
+				# optimizing away comparison-of-constants here is pretty hard, not worth it.
+				p[0] = ( ( p[2], p[1], p[3] ), )
 			if p[0] == 'unset':
 				p[0] = ( ( logop, ( 'BOOLEAN', ) + p[1], ( 'BOOLEAN', ) + p[3] ), )
 		else:
 			raise RulesSyntaxError("line %s: Internal error: unexpected leanboolean production length %s" % (
 				p.lexer.lineno, len(p)))
+
+	def p_compop(self, p):
+		'''compop : EQUALSEQUALS
+		          | EQUALSTILDE
+			  | BANGEQUALS
+		          | GT
+		          | LT
+		          | GE
+		          | LE'''
+		p[0] = {
+			'==': 'EQUAL',
+			'!=': 'NOT-EQUAL',
+			'=~': 'MATCH-REGEX',
+			'GT': 'GREATER',
+			'LT': 'LESS',
+			'GE': 'GREATER-EQUAL',
+			'LE': 'LESS-EQUAL',
+		}[p[1]]
 
 	def p_error(self, p):
 		if p == None:
