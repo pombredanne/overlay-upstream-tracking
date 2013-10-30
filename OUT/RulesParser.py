@@ -60,7 +60,7 @@ class Luthor(OOLexer):
 		'COLONEQUALS',
 		'PLUSPLUSPLUS',
 		'EQUALSEQUALS',
-		'TILDEEQUALS',
+		'EQUALSTILDE',
 		'GT',
 		'LT',
 		'GE',
@@ -98,7 +98,7 @@ class Luthor(OOLexer):
 	t_EQUALSEQUALS = r'=='
 	t_BANG = r'!'
 	t_BANGEQUALS = r'!='
-	t_TILDEEQUALS = r'~='
+	t_EQUALSTILDE = r'=~'
 	t_GT = r'>'
 	t_LT = r'<'
 	t_GE = r'>='
@@ -319,7 +319,7 @@ class RulesParser(OOParser):
 			# theoretically we could do a bunch more optimizing here.... starts to get quite complicated
 			# though, and probably not worth the effort.  For example ! ( x <= y || a == b ) ==> (x > y && a != b)
 			# It might be worthwhile if we could drive 'NOT' out of the generated syntax entirely; however,
-			# we can't, as there is no converse for the ~= regex matching operator.
+			# we can't, as there is no converse for the =~ regex matching operator.
 			else:
 				p[0] = ( 'NOT', ( 'BOOLEAN', ) + p[2] )
 		# ( <leanboolean> )
@@ -493,7 +493,7 @@ class RulesParser(OOParser):
 #   >  (strictly greater-than)
 #   <= (less-than or equal to)
 #   >= (greater-than or equal to)
-#   ~= (matches regular-expression)
+#   =~ (matches regular-expression)
 #
 # Operator precedence and grouping for booleans does matter -- it works the same as in C.
 #
