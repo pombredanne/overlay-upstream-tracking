@@ -304,7 +304,7 @@ class RulesParser(OOParser):
 		# True/False
 		if len(p) == 2:
 			p[0] = ( p[1], )
-		# ! <leanboolean>; optimize ( 'NOT', ('BOOLEAN', 'true|false' ) )
+		# ! <leanboolean>
 		elif len(p) == 3:
 			if p[2] == ( 'true', ):
 				p[0] = ( 'false', )
@@ -316,6 +316,10 @@ class RulesParser(OOParser):
 					raise RulesSyntaxError("line %s: Internal error: unexpected NOT target: %s" % (
 						p.lexer.lineno, p[2][1]))
 				p[0] = p[2][1][1]
+			# theoretically we could do a bunch more optimizing here.... starts to get quite complicated
+			# though, and probably not worth the effort.  For example ! ( x <= y || a == b ) ==> (x > y && a != b)
+			# It might be worthwhile if we could drive 'NOT' out of the generated syntax entirely; however,
+			# we can't, as there is no converse for the ~= regex matching operator.
 			else:
 				p[0] = ( 'NOT', ( 'BOOLEAN', ) + p[2] )
 		# ( <leanboolean> )
@@ -443,7 +447,11 @@ class RulesParser(OOParser):
 # is to avoid any potential ambiguity/confusion/error about "=" vs. "==";
 # I guess Pascal programmers will enjoy it, if there are any left :)
 #
-# In if clauses, it's legal for the <statements> part to be empty, so, i.e.,
+# Note also that none of the parenthesis, curly-braces, or semicolons above are
+# optional.  When in doubt, spell it out!  This makes parsing much easier
+# for the framework and avoids, i.e., the classic C dangling-else problem.
+#
+# In if clauses, it's legal for the <statements> parts to be empty, so, i.e.,
 #
 #   if (false) {} else { a:="foo"; };
 #
@@ -483,21 +491,23 @@ class RulesParser(OOParser):
 #   != (inequality)
 #   <  (strictly less-than)
 #   >  (strictly greater-than)
-#   <= (less-than-or-equal-to)
-#   >= (greater-than-or-equal-to)
-#   ~= (regular expression matching)
+#   <= (less-than or equal to)
+#   >= (greater-than or equal to)
+#   ~= (matches regular-expression)
 #
 # Operator precedence and grouping for booleans does matter -- it works the same as in C.
 #
-# Note that, unlike most "real" languages, there is no kind of "coorsion" allowed between values
-# and booleans.  To effectively "coorce" a string into a boolean, you could always explicitly say what you
-# mean, i.e.:
+# Note that, unlike most "real" languages, there is no kind of "coercion" allowed between values
+# and booleans.  To effectively "coerce" a string into a boolean, you could always explicitly say
+# what you wanted to happen and when, i.e.:
 #
-#   if (x == "true") {
-#       y := "1"
+#   if ("${x}" == "true") {
+#       y := "1";
+#   } elif ("${x}" == "false") {
+#       y := "0";
 #   } else {
-#       y := "0"
-#   }
+#       die();
+#   };
 #
 # The quantitative comparison operators are not alphabetical (indeed, attempting to use them for
 # alphabetical comparison of non-like atoms will have undefined results and may be made an error
