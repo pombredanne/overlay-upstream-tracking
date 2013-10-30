@@ -76,6 +76,8 @@ class Luthor(OOLexer):
 		'ESCAPEDSLASH',
 		'ESCAPEDNEWLINE',
 		'STRINGLITERALTEXT',
+		'OR',
+		'AND',
 		'ID',
 	] + list(reserved.values())
 
@@ -101,6 +103,8 @@ class Luthor(OOLexer):
 	t_LT = r'<'
 	t_GE = r'>='
 	t_LE = r'<='
+	t_OR = r'\|\|'
+	t_AND = r'&&'
 	t_SEMICOLON = r';'
 
 	def t_newline(self, t):
@@ -186,6 +190,13 @@ class RulesParser(OOParser):
 			kwargs = kwargs.copy()
 			kwargs['tabmodule'] = 'RulesParser_parsetab'
 		super(RulesParser, self).__init__(lexer, **kwargs)
+
+	def get_precedence(self):
+		return (
+			('left', 'OR'),
+			('left', 'AND'),
+			('right', 'BANG'),
+		)
 
 	def p_rulesprogram(self, p):
 		'rulesprogram : statements'
@@ -287,7 +298,9 @@ class RulesParser(OOParser):
 		'''leanboolean : TRUE
 		               | FALSE
 			       | BANG leanboolean
-			       | LPAREN leanboolean RPAREN'''
+			       | LPAREN leanboolean RPAREN
+			       | leanboolean OR leanboolean
+			       | leanboolean AND leanboolean'''
 		# True/False
 		if len(p) == 2:
 			p[0] = ( p[1], )
@@ -297,14 +310,55 @@ class RulesParser(OOParser):
 				p[0] = ( 'false', )
 			elif p[2] == ( 'false', ):
 				p[0] = ( 'true', )
+			# optimize to avoid ( 'NOT', ( 'BOOLEAN', ( 'NOT' , ...)))
+			elif len(p[2]) == 2 and p[2][0] == 'NOT':
+				if len(p[2][1] != 2) or p[2][1][0] != 'BOOLEAN':
+					raise RulesSyntaxError("line %s: Internal error: unexpected NOT target: %s" % (
+						p.lexer.lineno, p[2][1]))
+				p[0] = p[2][1][1]
 			else:
 				p[0] = ( 'NOT', ( 'BOOLEAN', ) + p[2] )
 		# ( <leanboolean> )
-		elif len(p) == 4:
+		elif len(p) == 4 and p[1] == '(' and p[3] == ')':
 			# just ignore the parenthesis, since this will become an unambiguous
 			# ( 'BOOLEAN', <whatever> ) construct in all contexts where this production
 			# is selected by the parser.
 			p[0] = p[2]
+		# leanboolean and|or leanboolean
+		elif  len(p) == 4:
+			# optimize away silly shit like: ( 'OR' ( 'BOOLEAN' 'true' ) ('BOOLEAN' 'false' ))
+			p[0] = 'unset'
+			if p[2] == '||':
+				logop = 'OR'
+				if p[1] == ( 'true', ):
+					p[0] = ( 'true' ,)
+				elif p[3] == ( 'true', ):
+					p[0] = ( 'true', )
+				# false || XYZ ==> XYZ
+				elif p[1] == ( 'false', ):
+					p[0] = p[3]
+				# XYZ || false ==> XYZ
+				elif p[3]  == ( 'false', ):
+					p[0] = p[1]
+				# TODO: foo || bar || baz ==> ('OR' foo bar baz); since we left-bind, ...
+			elif p[2] == '&&':
+				logop = 'AND'
+				if p[1] == ( 'false', ):
+					p[0] = ( 'false' ,)
+				elif p[3] == ( 'false', ):
+					p[0] = ( 'false', )
+				# true && XYZ ==> XYZ
+				elif p[1] == ( 'true', ):
+					p[0] = p[3]
+				# XYZ && true ==> XYZ
+				elif p[3] == ( 'false', ):
+					p[0] = p[1]
+				# TODO: foo && bar && baz ==> ('AND' foo bar baz); since we left-bind, ...
+			else:
+				raise RulesSyntaxError("line %s: Internal error: unexpected logop %s" % (
+					p.lexer.lineno, len(p)))
+			if p[0] == 'unset':
+				p[0] = ( ( logop, ( 'BOOLEAN', ) + p[1], ( 'BOOLEAN', ) + p[3] ), )
 		else:
 			raise RulesSyntaxError("line %s: Internal error: unexpected leanboolean production length %s" % (
 				p.lexer.lineno, len(p)))
