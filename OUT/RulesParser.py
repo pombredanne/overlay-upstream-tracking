@@ -426,32 +426,78 @@ class RulesParser(OOParser):
 # The rule "language" consists of a series of statements.
 # Supported statements are:
 #
-#   <variable-name> := <value>; (assignment)
+#   <variable-name> := <value>; 			(assignment)
 #
-#   if <boolean> { <statements> } [ elif <boolean> { <statements> } ... ] [ else { <statements> } ];
+#   if ( <boolean> ) { <statements> }			(conditional execution)
+#       [ elif <boolean> { <statements> } ... ]
+#       [ else { <statements> } ];
 #
-#   die <value> | pass | update <value>; (binding statements)
+#   die <value> | pass | update <value>;		(binding statements)
 #
-#   warn <value> | punt; (nonbinding statements)
+#   warn <value> | punt;				(nonbinding statements)
 #
-#   upgrade_overlay <value>; (weird statements)
+#   upgrade_overlay <value>;				(special, see below)
 #
-# <value>s are always strings.  They may be string literals, or they may be calculated by the built-in
-# "functions".  More on those below.  The string literals are enclosed in double quotes and support a
-# vaguely bash-like variable substitution syntax, i.e., "foo is \"${foo}\"."
-# would evaluate to 'foo is "bar"' if the value of the foo variable were 'bar'.  No fancy bash variable
-# substitution features are supported.  Literal '"' and '$' characters may be
-# represented by quoting them with a backslash.  Literal '\' characters may also be
-# similarly quoted, although it's hard to imagine why you'd want to.
+# Note that the language meticulously avoids assigning any meaning to "=".
+# Although this will probably trip C programmers up (sorry, guys!), the idea
+# is to avoid any potential ambiguity/confusion/error about "=" vs. "==";
+# I guess Pascal programmers will enjoy it, if there are any left :)
+#
+# In if clauses, it's legal for the <statements> part to be empty, so, i.e.,
+#
+#   if (false) {} else { a:="foo"; };
+#
+# is valid and equivalent to just
+#
+#   a := "foo";
+#
+# <value>s are /always/ strings. They may be "literals", or they may be calculated by the built-in
+# functions.  More on those below.  The string literals are enclosed in double quotes and support a
+# vaguely bash-like variable substitution syntax, i.e.,
+#
+#   foo := "bar";
+#   baz := "${foo}";
+#
+# would set the baz variable to the value "bar".
+#
+# No fancy bash variable substitution features are supported.  # Literal '"', '$' and '\' characters
+# may be represented by quoting them with a backslash.  In order to prevent their default meanings
+# (end-of-quote, variable-substitution and quoting, respectively), from being applied within a
+# string literal.
 #
 # String values (there is no other kind) may be concatenated with the +++ operator.
 #
-# <boolean>s are always in one of three forms:
-# (<value> COMPOP <value>), where COMPOP is one of:
-# ==, !=, <, >, <=, >= (boolean comparison) or ~= (regular expression matching)
-# or (<boolean> LOGOP <boolean>), where LOGOP is one of:
-# && ||, or (! <boolean>).  The meanings should be fairly obvious.  True and False may
-# also be used as boolean constants.
+# <boolean>s are always in one of these forms:
+#
+#   <value> COMPOP <value> (value comparison, see below)
+#   <boolean> && <boolean> (logical and)
+#   <boolean> || <boolean> (logical or)
+#   ! <boolean>            (logical not)
+#   true                   (true)
+#   false                  (also true (just kidding, false, of course))
+#   ( <boolean> )	   (to control order-of-operations)
+#
+# COMPOP may be any of the following comparison operators:
+#
+#   == (equality)
+#   != (inequality)
+#   <  (strictly less-than)
+#   >  (strictly greater-than)
+#   <= (less-than-or-equal-to)
+#   >= (greater-than-or-equal-to)
+#   ~= (regular expression matching)
+#
+# Operator precedence and grouping for booleans does matter -- it works the same as in C.
+#
+# Note that, unlike most "real" languages, there is no kind of "coorsion" allowed between values
+# and booleans.  To effectively "coorce" a string into a boolean, you could always explicitly say what you
+# mean, i.e.:
+#
+#   if (x == "true") {
+#       y := "1"
+#   } else {
+#       y := "0"
+#   }
 #
 # The quantitative comparison operators are not alphabetical (indeed, attempting to use them for
 # alphabetical comparison of non-like atoms will have undefined results and may be made an error
@@ -508,8 +554,7 @@ class RulesParser(OOParser):
 # a given less-specific atom.  The function "revbump" takes a given fully-qualified atom and adds
 # one to the revision number, so, i.e, =sys-devel/gcc-4.6.4 would become =sys-devel/gcc-4.6.4-r1.
 #
-# There is no such thing as user-defined functions, so henceforth 'functions' can be taken to mean
-# 'built-in functions'.
+# There is no support for user-defined functions.
 #
 # For eclasses, many of the built-in variables and functions are not applicable.  ${CATEGORY} is the fake-ish
 # category "eclass" and ${PV} and similar varibles are always the empty string.  It is best to put separate
