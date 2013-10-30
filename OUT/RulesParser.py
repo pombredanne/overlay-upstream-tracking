@@ -16,6 +16,7 @@
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from OUT.OOParsing import OOLexer, OOParser
+from pprint import pprint
 
 class RulesSyntaxError(Exception):
 	'''Thrown if errors are encountered parsing the rules files'''
@@ -260,6 +261,9 @@ class RulesParser(OOParser):
 			raise RulesSyntaxError("Syntax error: unexpected end of file (missing semicolon?)")
 		else:
 			raise RulesSyntaxError("line %s: Syntax error: '%s'" % (p.lexer.lineno, p.value))
+
+	def testparse(self, data):
+		pprint(self.parse(data))
 
 # FIXME: move to some kind of documentation or manpage place & correct
 # innacuracies
