@@ -266,7 +266,12 @@ class RulesParser(OOParser):
 		          | ESCAPEDDOLLAR
 			  | ESCAPEDSLASH
 			  | ESCAPEDNEWLINE'''
-		p[0] = ( 'STRINGLITERAL', p[1][1] )
+		p[0] = ( 'STRINGLITERAL', {
+			'"': '"',
+			'$': '$',
+			'\\': '\\',
+			'n': '\n',
+		}[p[1][1]] )
 
 	def p_literal(self, p):
 		'literal : STRINGLITERALTEXT'
