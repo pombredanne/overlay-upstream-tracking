@@ -16,10 +16,8 @@
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from OUT.OOParsing import OOLexer, OOParser
+from OUT.Rules import *
 from pprint import pprint
-
-class RulesSyntaxError(Exception):
-	'''Thrown if errors are encountered parsing the rules files'''
 
 class Luthor(OOLexer):
 	'''NewLexer-based lexer for rules language'''
@@ -200,20 +198,16 @@ class RulesParser(OOParser):
 
 	def p_rulesprogram(self, p):
 		'rulesprogram : statements'
-		p[0] = ( 'RULESPROGRAM', ) + p[1]
+		RulesProgramProduction(p)
 
 	def p_statements(self, p):
 		'''statements : statements statement
 		              | empty'''
-
-		if len(p) == 3:
-			p[0] = p[1] + ( p[2], )
-		else:
-			p[0] = ()
+		StatementsProduction(p)
 
 	def p_empty(self, p):
 		'empty :'
-		pass
+		EmptyProduction(p)
 
 	def p_statement(self, p):
 		'''statement : assignment SEMICOLON
@@ -414,7 +408,8 @@ class RulesParser(OOParser):
 			raise RulesSyntaxError("line %s: Syntax error: '%s'" % (p.lexer.lineno, p.value))
 
 	def testparse(self, data):
-		pprint(self.parse(data))
+		r = self.parse(data)
+		pprint (getattr(r, 'pprint_repr'), r)
 
 # FIXME: move to some kind of documentation or manpage place & correct
 # innacuracies

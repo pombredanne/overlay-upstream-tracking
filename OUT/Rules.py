@@ -15,13 +15,26 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-from OUT.RulesParser import RulesParser
 from pkg_resources import Requirement, resource_filename
 from portage.const import EPREFIX
+from ply.yacc import YaccProduction, YaccSymbol
+from collections import Sequence, MutableSequence
+from copy import copy, deepcopy
+from itertools import chain
 import os
 
-__all__ = [ 'GlobalRulesNotFoundException', 'get_global_rules_filepath' ]
+__all__ = [ 'EmptyProduction', 'GlobalRulesNotFoundException', 'get_global_rules_filepath',
+	    'StatementsProduction', 'SyntaxErrorProduction', 'InternalErrorProduction',
+	    'RulesProgramProduction', 'RulesSyntaxError', 'RulesParserInternalError',
+	    'GlobalRulesNotFoundException', 'BaseProduction' ]
 
+class RulesSyntaxError(Exception):
+	'''Thrown if errors are encountered parsing the rules files'''
+# not to be confused with an /internalized/ error which is a production representing an
+# error which has been accepted into the tree of productions on the assumption that
+# some container will know what to do with it later in the parsing process.
+class RulesParserInternalError(Exception):
+	'''Thrown if the parser gets hopelessly confused in some unexpected way'''
 class GlobalRulesNotFoundException(Exception):
 	'''Thrown if the global rules repository is not present where OUT.Rules
 	   expects to find it (typically: /usr/share/overlay-upstream-tracking/outrules.d)'''
@@ -53,3 +66,488 @@ def get_global_rules_filepath():
 			raise FileNotFoundException('Path %s not found' % _EXPECTED_OUTRULES_D_LOCATION)
 		_global_rules_filepath = os.path.dirname(testpath)
 	return _global_rules_filepath
+
+# --------------------------- mini production framework (put in OOParsing?) ---------------
+
+# nb: Mixin subclasses should come AFTER the main superclass in inherits clauses (MRO)
+class BaseProduction(object):
+	'''Base class for Productions containing mostly Error-Handling glue; accomodating
+	   both instantly-explosive errors and error-delaying modes of operation'''
+	__slots__ = [ 'is_error', 'error_msg', 'error_exception_class', 'p', 'value', 'type' ]
+	def __init__(self, p, is_error=False, internalize_error=False, error_msg='Unknown Error',
+			error_exception_class=RulesSyntaxError, no_auto_assign=False,
+			value=None, type=None, **kwargs):
+		# handle any error
+		self.is_error = is_error
+		self.error_msg = error_msg
+		self.error_exception_class = error_exception_class
+		self.p = p
+		# kinda fuzzy on how this should work, oh well....
+		try:
+			self.value = getattr(p, 'value', getattr(p[0], 'value', None))
+		except:
+			self.value = None
+			pass
+		slice = getattr(p, 'slice', None)
+		if slice:
+			self.type = slice[0]
+		else:
+			self.type = None
+		if self.__class__ == BaseProduction:
+			self.error_exception_class = RulesParserInternalError
+			self.error_msg = 'Abstract BaseProduction Instantiated'
+			self.is_error = True
+			self.Error()
+		if len(kwargs) > 0:
+			self.error_exception_class = RulesParserInternalError
+			self.error_msg = 'non-empty kwargs: %s' % kwargs
+			self.is_error = True
+			self.Error()
+		if self.is_error and not internalize_error:
+			self.Error()
+
+		# we know kwargs is empty as we tested for it above;
+		# fine as we should be the last Production class on mro
+		super(BaseProduction, self).__init__()
+
+		# a hook for subclasses to perform final initialization steps after all
+		# of the __init__ mro has completed.  After this, self should
+		# be fully constructed at the python level.  For containers
+		# this must finalize containment relationships
+		self.init_hook()
+
+		# a hook for subclasses to perform final validation steps and raise
+		# exceptions in response to semantic inconsistencies
+		self.validate()
+
+		# a hook for subclasses to restructure their productions
+		# using various recipies to simplify the semantic structure without
+		# changing the meaning.
+		self.optimize()
+
+		# all initializations, validations and optimizations successful: assign
+		if not no_auto_assign:
+			p[0] = self
+
+	def init_hook(self):
+		pass
+	def validate(self):
+		pass
+	def optimize(self):
+		pass
+
+	def BlameSelfFor(self, error_production):
+		'''Internalize the error metadata from a foreign production'''
+		if not from_production.is_error:
+			self.error_msg = 'Blamed for non error: %s' % error_production
+			self.error_exception_class = RulesParserInternalError
+			self.is_error = True
+		else:
+			self.error_msg = from_production.error_msg
+			self.error_exception_class = from_production.error_exception_class
+			self.is_error = from_production.is_error
+
+	def Error(self, from_production=None):
+		'''Raise an error corresponding to __init__ialized values (optionally cloned from
+		   a foreign production)'''
+
+		if from_production != None:
+			self.BlameSelfFor(from_production)
+
+		# make sure we really have an error (otherwise ... well now we are one due to that)
+		if not self.is_error:
+			self.is_error = True
+			self.error_exception_class = RulesParserInternalError
+			self.error_msg = 'Error invocation on non error %s' % self
+
+		if self.p == None:
+			error_msg = 'Unexpected EOF while parsing'
+			if self.error_msg != 'Unknown Error':
+				error_msg += ': ' + self.error_msg
+		else:
+			error_msg = 'line %s: ' % self.p.lexer.lineno + self.error_msg
+			error_msg += ': %s' % self.value
+
+		raise self.error_exception_class(error_msg)
+	def __repr__(self):
+		if isinstance(self.p, YaccProduction):
+			p_repr = ''
+			if self.type is not None:
+				p_repr += repr(self.type)
+			if self.value is not None:
+				p_repr += '/'
+				p_repr += repr(self.value)
+		else:
+			p_repr = repr(self.p)
+		if self.is_error:
+			return '<(ERROR: %s: %s) %s: p=%s>' % (
+				self.error_exception_class, self.error_msg, self.__class__.__name__, p_repr)
+		else:
+			return '<%s: p=%s>' % (self.__class__.__name__, p_repr)
+	def pprint_repr(self):
+		return self
+	def __str__(self):
+		return self.__repr__()
+	def __eq__(self, other):
+		rslt = self.is_error == other.is_error
+		if rslt and self.is_error:
+			rslt = rslt and self.error_msg == other.error_msg
+			rslt = rslt and self.error_exception_class == other.error_exception_class
+		rslt = rslt and self.p.__eq__(other.p)
+		return rslt
+
+	# We don't know how __init__ was invoked and doing the right thing would be incredibly
+	# complicated.  Hopefully this works like magic so long as everybody uses __slots__,
+	# like they're supposed to.
+	def __copy__(self):
+		try:
+			subcopy = super(BaseProduction, self).__copy__
+		except AttributeError as e:
+			subcopy = None
+			pass
+		if subcopy is None:
+			# best guess impl.: we basically want this to work for the
+			# "normal" case where the only superclass behind us on the
+			# mro is object.  Otherwise, ... meh, they shoulda implemented
+			# __copy__,  I guess, or done god-knows-what.
+			rslt = self.__class__.__new__(self.__class__)
+			if hasattr(self, '__dict__'):
+				for attr in self.__dict__:
+					if not attr.startswith("__"):
+						rslt.setattr(attr, self.getattr(attr))
+		else:
+			# presumably they know what they are doing...
+			rslt = subcopy()
+		# subclasses of RulesProductions are required to use __slots__
+		for attr in chain.fromiterable(
+			getattr(cls, '__slots__', [])
+				for cls in type(self).__mro__
+					if issubclass(cls, BaseProduction)
+		):
+			rslt.setattr(attr, self.getattr(attr))
+	def __deepcopy__(self):
+		try:
+			subcopy = super(BaseProduction, self).__deepcopy__
+		except AttributeError as e:
+			subcopy = None
+			pass
+		if subcopy is None:
+			# best guess impl.: we basically want this to work for the
+			# "normal" case where the only superclass behind us on the
+			# mro is object.  Otherwise, ... meh, they shoulda implemented
+			# __copy__,  I guess, or done god-knows-what.
+			rslt = self.__class__.__new__(self.__class__)
+			if hasattr(self, '__dict__'):
+				for attr in self.__dict__:
+					if not attr.startswith("__"):
+						rslt.setattr(attr, deepcopy(self.getattr(attr)))
+		for attr in chain.fromiterable(
+			getattr(cls, '__slots__', [])
+				for cls in type(self).__mro__
+					if issubclass(cls, BaseProduction)
+		):
+			itemref = self.getattr(attr)
+			if attr == 'p':
+				# First, we do not want p[0] to change automatically to match
+				# this new object's copy.  presumably the cloning is
+				# happening during optimize(), in which case, assignment of p[0]
+				# has not yet happened, and the class responsible for this
+				# is still going to do it.... if whoever cloned us wants that
+				# to happen, they're welcome to do it themselves manually.
+				# Also we shouldn't deepcopy p.  It probably contains
+				# backreferences to the full lexer and parser.  That's
+				# a bit much.  It's reasonably safe to assume
+				# nothing horrible will happen if we simply
+				# create a reference to the same p.  If for some reason
+				# someone decides to go mucking around in there,
+				# they will just have to know what they are doing.
+				rslt.setattr('p', self.p)
+			elif isinstance(itemref, type):
+				# cloning class objects seems very extreme :) leave 'em.
+				rslt.setattr(attr, itemref)
+			else:
+				rslt.setattr(attr, deepcopy(itemref))
+
+class ErrorProduction(BaseProduction):
+	'''Abstract convenience subclass for creating a standard internalized error'''
+	__slots__ = []
+	def __init__(self, p, error_msg='Error', internalize_error=False,
+		     error_exception_class=None, **kwargs):
+		kwargs['is_error'] = True
+		if error_exception_class is None:
+			kwargs['internalize_error'] = False
+			kwargs['error_excpetion_class'] = RulesParserInternalError
+			kwargs['error_msg'] = 'MetaError (%s)' % error_msg
+		else:
+			kwargs['error_msg'] = error_msg
+			kwargs['internalize_error'] = internalize_error
+			kwargs['error_exception_class'] = error_exception_class
+		super(SyntaxErrorProduction, self).__init__(p, **kwargs)
+
+class SyntaxErrorProduction(ErrorProduction):
+	__slots__ = []
+	def __init__(self, p, error_exception_class=RulesSyntaxError, **kwargs):
+		kwargs['error_exception_class'] = error_exception_class
+		super(SyntaxErrorProduction, self).__init__(p, **kwargs)
+
+class InternalErrorProduction(ErrorProduction):
+	__slots__ = []
+	def __init__(self, p, error_exception_class=RulesParserInternalError, **kwargs):
+		kwargs['error_exception_class'] = error_exception_class
+		super(InternalErrorProduction, self).__init__(p, **kwargs)
+
+class SequenceProduction(BaseProduction, Sequence):
+	'''Mixin nestable sequence abstraction for Productions.  If Sequence methods
+	   from this class are called directly or via super() then it will behave as if
+	   it is empty'''
+	__slots__ = []
+
+	def __init__(self, p, sequence_data=None, **kwargs):
+		if sequence_data != None:
+			kwargs['is_error'] = True
+			kwargs['internalize_error'] = False
+
+			kwargs['error_msg'] = \
+				'Sequence Production subclass %s failed to process sequence_data' % type(self)
+		super(SequenceProduction, self).__init__(p, **kwargs)
+
+	def __getitem__(self, index):
+		raise IndexError
+
+	def __len__(self):
+		return 0
+
+	def _depth_iter(self, _class, seen, include_containers):
+		'''Internal function implementing the depth_iter generator for a given set of arguments'''
+		for i in iter(self):
+			if isinstance(i, _class) and i not in seen:
+				seen.append(i)
+				if include_containers:
+					yield(i)
+				# infinite depthwise recursion:
+				for i2 in i._depth_iter(_class, seen, include_containers):
+					yield(i2)
+			else:
+				yield(i)
+		return
+
+	def depth_iter(self, container_class=None, include_containers=False):
+		'''Returns an iterator that flattens any hierarchy of container elements,
+		   treating any element which is not an instance of container_class as a
+		   non-container.  Travereses depth first, yeilding only the leaves,
+		   unless include_containers is True, in which case, also yeild the
+		   containers, in-line, followed by their containees'''
+		if not container_class:
+			container_class = type(self)
+		return self._depth_iter(container_class, [], include_containers)
+
+	def deep_search(self, testfunc, test_containers=True):
+		'''Checks all sub-items, recursively, for any item passing testfunc(item), with
+		   automatic handling of self-containing items.  Only sub-items which are
+		   instances of the same class as self are traversed.  Once a passing item
+		   is found, it is immediately returned as ( True, item ); otherwise,
+		   ( False, None ) is returned'''
+		for i in self.depth_iter(include_containers=test_containers):
+			if testfunc(i):
+				return True, i
+		return False, None
+
+	def deep_contains(self, item):
+		rslt, ignore = self.deep_search(lambda(x): x == item)
+		return rslt
+	def deep_contains_instance(self, _class=None):
+		if not _class:
+			_class = type(self)
+		rslt, ignore = self.deep_search(lambda(x): isinstance(x, _class))
+		return rslt
+
+class SingletonProduction(SequenceProduction):
+	'''Mixin SequenceProduction that cannot deep_contain any instance of its own class'''
+	__slots__= []
+	def validate(self):
+		if self.deep_contains_instance():
+			self.is_error = True
+			self.error_msg = 'Double Singleton encountered for ' + self.__class__.__name__
+			self.error_exception_class = RulesSyntaxError
+			self.Error()
+
+class EmptyProduction(SequenceProduction):
+	"""Placeholder for empty productions, implemented as a cointainer since typically
+	   we use empty in rules like 'foo : empty | foo bar'.  Note that we do not set
+	   no_auto_assign -- therefore to make EmptyProductions disappear, something must
+	   happen in optimize() of containee classes.'  Otherwise, we end up with a
+	   SequenceProduction with a single None containee (so, if that's what you want,
+	   don't use this)"""
+	__slots__ = []
+	def __repr__(self):
+		return '<EmptyProduction>'
+	def __contains__(self, item):
+		return False
+	def __eq__(self, other):
+		return isinstance(other, EmptyProduction) or \
+			super(EmptyProduction, self).__eq__(other)
+
+class MutableSequenceProduction(SequenceProduction, MutableSequence):
+	'''Mixin Abstract Mutable Sequence Production.  If MutableSequence methods from this
+	   class are called directly or via super() then it will behave as if it is empty/broken'''
+	__slots__ = []
+	def __setitem__(self, index, value):
+		raise IndexError
+	def __delitem__(self, index):
+		raise IndexError
+	def __insert__(self, index, value):
+		raise IndexError
+
+# the following is 90% boilerplate cloning of the patterns in UserList.py.
+# the only exceptions are:
+#
+#   __init__:      translate the UserList code to use the standard MixIn patterns
+#                  appropriate in BaseProductions
+#
+#   __repr__:      Offer a distinctly tuple-ish repr with fake [0] items representing
+#                  the attributes of the container
+#
+#   __{,i,r}add__: clone() rather than attempt to unravel the rather complicated
+#                  puzzle of self-constructing ourselves without side-effects
+#                  note that clone() assumes that it is good enough to
+#                  call __new__() (which probably just does object.__new__(self.__class__))
+#                  and assign all the inherited attributes from __slots__.
+class UserListProduction(MutableSequenceProduction):
+	'''Production Mixin analogoue to the UserList class.'''
+	__slots__ = [ 'data' ]
+	def __init__(self, p, user_list_data=None, **kwargs):
+		self.data = []
+		if user_list_data != None:
+			if type(init_list_data) == type(self.data):
+				self.data[:] = init_list_data
+			elif isinstance(init_list_data, UserListProduction):
+				self.data[:] = init_list_data.data[:]
+			elif isinstance(init_list_data, Sequence):
+				self.data = [ x for x in iter(init_list_data) ]
+			else:
+				self.data = list(user_list_data)
+		super(UserListProduction, self).__init__(p, **kwargs)
+
+	def prodrepr(self):
+		'''A way to get at the "inherited" (standard) Production __repr__ behavior,
+		   instead of the overridden TupleProduction __repr__ that looks like a tuple'''
+		return super(UserListProduction, self).__repr__()
+
+	def __repr__(self):
+		"""Internal proxy for handling __repr__ of UserListProduction's.  Instead of
+		   displaying the contents directly, they are represented as a tuple with
+		   a 'rogue' first item which exposes information about self, followed
+		   by the remaining items (also as part of the tuple)."""
+		proxytuple = ( self.prodrepr(), ) + tuple(self.data)
+		return proxytuple.__repr__()
+
+	def __lt__(self, other): return self.data < self.__cast(other)
+	def __le__(self, other): return self.data <= self.__cast(other)
+	def __eq__(self, other): return self.data == self.__cast(other)
+	def __ne__(self, other): return self.data != self.__cast(other)
+	def __gt__(self, other): return self.data > self.__cast(other)
+	def __ge__(self, other): return self.data >= self.__cast(other)
+	def __cast(self, other):
+		if isinstance(other, UserListProduction): return other.data
+		else: return other
+	def __cmp__(self, other):
+		return cmp(self.data, self.__cast(other))
+	def __hash__(self):
+		# not supported for mutables.
+		return None
+	def __contains__(self, item): return item in self.data
+	def __len__(self): return len(self.data)
+	def __getitem__(self, i): return self.data[i]
+	def __setitem__(self, i, item): self.data[i] = item
+	def __delitem__(self, i, item): del self.data[i]
+	def __getslice__(self, i, j):
+		i = max(i, 0)
+		j = max(j, 0)
+		return self.__class__(self.data[i:j])
+	def __setslice__(self, i, j, other):
+		i = max(i, 0)
+		j = max(j, 0)
+		if isinstance(other, UserListProduction):
+			self.data[i:j] = other.data
+		elif isinstance(other, type(self.data)):
+			self.data[i:j] = other
+		else:
+			self.data[i:j] = list(other)
+	def __delslice__(self, i, j):
+		i = max(i, 0)
+		j = max(j, 0)
+		del self.data[i:j]
+	def __add__(self, other):
+		rslt = copy(self)
+		if isinstance(other,UserListProduction):
+			rslt.data += other.data
+		elif isinstance(other, type(self.data)):
+			rslt.data += other
+		else:
+			rslt.data += list(other)
+		return rslt
+	def __radd__(self, other):
+		rslt = copy(self)
+		if isinstance(other, UserListProduction):
+			rslt.data = other.data
+		elif isinstance(other, type(self.data)):
+			rslt.data = other
+		else:
+			rslt.data = list(other)
+		rslt.data += self.data
+		return rslt
+	def __iadd__(self, other):
+		if isinstance(other, UserListProduction):
+			self.data += other.data
+		elif isinstance(other, type(self.data)):
+			self.data += other
+		else:
+			self.data += list(other.data)
+		return self
+	def __mul__(self, n):
+		rslt = copy(self)
+		rslt.data *= n
+		return rslt
+	def __rmul__(self, n):
+		rslt = copy(self)
+		rslt.data *= n
+		return rslt
+	def __imul__(self, n):
+		self.data *= n
+		return self
+	def append(self, item): self.data.append(item)
+	def insert(self, i, item): self.data.insert(i, item)
+	def pop(self, i=-1): self.data.pop(i)
+	def remove(self, item): self.data.remove(item)
+	def count(self, item): return self.data.count(item)
+	def index(self, item, *args): return self.data.index(item, *args)
+	def reverse(self): self.data.reverse()
+	def sort(self, *args, **kwargs): self.data.sort(*args, **kwargs)
+	def extend(self, other):
+		if isinstance(other, UserListProduction):
+			self.data.extend(other.data)
+		else:
+			self.data.extend(other)
+
+class SkipsEmptyProduction(MutableSequenceProduction):
+	'''Mixin SequenceProduction that disappears EmptyProductions in its children'''
+	__slots__ = []
+	def optimize(self):
+		pass
+
+class AssociativeProduction(MutableSequenceProduction):
+	'''Mixin SequenceProduction that merges containees of the same class as self'''
+	__slots__ = []
+	def optimize(self):
+		pass
+
+# ------------------------------ here is the semantically interesting stuff ------------------
+
+class StatementsProduction(UserListProduction):
+	__slots__ = []
+	def init_hook(self):
+		self.data = self.p[1:]
+
+class RulesProgramProduction(StatementsProduction, SingletonProduction):
+	__slots__ = []
+	pass
