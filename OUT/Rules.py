@@ -21,6 +21,7 @@ from ply.yacc import YaccProduction, YaccSymbol
 from collections import Sequence, MutableSequence
 from copy import copy, deepcopy
 from itertools import chain
+from pprint import pprint
 import os
 
 __all__ = [ 'EmptyProduction', 'GlobalRulesNotFoundException', 'get_global_rules_filepath',
@@ -169,7 +170,8 @@ class BaseProduction(object):
 			error_msg += ': %s' % self.value
 
 		raise self.error_exception_class(error_msg)
-	def __repr__(self):
+
+	def __prod_repr(self):
 		if isinstance(self.p, YaccProduction):
 			p_repr = ''
 			if self.type is not None:
@@ -185,16 +187,35 @@ class BaseProduction(object):
 		else:
 			return '<%s: p=%s>' % (self.__class__.__name__, p_repr)
 	def pprint_repr(self):
-		return self
+		return self.__prod_repr()
+	def __repr__(self):
+		return self.__prod_repr()
+
 	def __str__(self):
-		return self.__repr__()
+		return __prod_repr(self)
 	def __eq__(self, other):
-		rslt = self.is_error == other.is_error
-		if rslt and self.is_error:
-			rslt = rslt and self.error_msg == other.error_msg
-			rslt = rslt and self.error_exception_class == other.error_exception_class
-		rslt = rslt and self.p.__eq__(other.p)
-		return rslt
+		if self is other:
+			return True
+		if super(BaseProduction, self).__eq__(other):
+			# good enough I guess
+			return True
+		if isinstance(other, BaseProduction):
+			if self.is_error != other.is_error:
+				return False
+			elif self.is_error and self.error_msg != other.error_msg:
+				return False
+			elif self.is_error and self.error_exception_class != other.error_exception_class:
+				return False
+			elif self.p != other.p:
+				return False
+			elif self.value != other.value:
+				return False
+			elif self.type != other.type:
+				return False
+			else:
+				return True
+		else:
+			return False
 
 	# We don't know how __init__ was invoked and doing the right thing would be incredibly
 	# complicated.  Hopefully this works like magic so long as everybody uses __slots__,
@@ -241,6 +262,9 @@ class BaseProduction(object):
 				for attr in self.__dict__:
 					if not attr.startswith("__"):
 						rslt.setattr(attr, deepcopy(self.getattr(attr)))
+		else:
+			# assume they know what they're doing
+			rslt = subcopy()
 		for attr in chain.fromiterable(
 			getattr(cls, '__slots__', [])
 				for cls in type(self).__mro__
@@ -248,20 +272,13 @@ class BaseProduction(object):
 		):
 			itemref = self.getattr(attr)
 			if attr == 'p':
-				# First, we do not want p[0] to change automatically to match
-				# this new object's copy.  presumably the cloning is
-				# happening during optimize(), in which case, assignment of p[0]
-				# has not yet happened, and the class responsible for this
-				# is still going to do it.... if whoever cloned us wants that
-				# to happen, they're welcome to do it themselves manually.
-				# Also we shouldn't deepcopy p.  It probably contains
+				# presumably the cloning mostly occurs during optimize() when
+				# assignment of p[0] has not yet happened; also, p may contain
 				# backreferences to the full lexer and parser.  That's
 				# a bit much.  It's reasonably safe to assume
 				# nothing horrible will happen if we simply
-				# create a reference to the same p.  If for some reason
-				# someone decides to go mucking around in there,
-				# they will just have to know what they are doing.
-				rslt.setattr('p', self.p)
+				# create a reference to the same p.
+				rslt.setattr('p', itemref)
 			elif isinstance(itemref, type):
 				# cloning class objects seems very extreme :) leave 'em.
 				rslt.setattr(attr, itemref)
@@ -301,14 +318,12 @@ class SequenceProduction(BaseProduction, Sequence):
 	   from this class are called directly or via super() then it will behave as if
 	   it is empty'''
 	__slots__ = []
-
-	def __init__(self, p, sequence_data=None, **kwargs):
-		if sequence_data != None:
+	def __init__(self, p, **kwargs):
+		if type(self) == SequenceProduction:
 			kwargs['is_error'] = True
 			kwargs['internalize_error'] = False
-
-			kwargs['error_msg'] = \
-				'Sequence Production subclass %s failed to process sequence_data' % type(self)
+			kwargs['error_msg'] = 'Abstract SequenceProduction instantiation'
+			kwargs['error_exception_class'] = RulesParserInternalError
 		super(SequenceProduction, self).__init__(p, **kwargs)
 
 	def __getitem__(self, index):
@@ -361,6 +376,27 @@ class SequenceProduction(BaseProduction, Sequence):
 		rslt, ignore = self.deep_search(lambda(x): isinstance(x, _class))
 		return rslt
 
+class TupleAppearanceProduction(SequenceProduction):
+	'''A Mixin that makes a SequenceProduction look like a tuple'''
+	__slots__  = []
+	def __init__(self, p, **kwargs):
+		if type(self) == TupleAppearanceProduction:
+			kwargs['is_error'] = True
+			kwargs['internalize_error'] = False
+			kwargs['error_msg'] = 'Abstract TupleAppearanceProduction instantiation'
+			kwargs['error_exception_class'] = RulesParserInternalError
+		super(TupleAppearanceProduction, self).__init__(p, **kwargs)
+	def __pprint_repr(self):
+		# Get at the "inherited" (standard) Production __repr__ behavior with super()
+		return ( super(TupleAppearanceProduction, self).pprint_repr(), ) + \
+			 tuple([getattr(item, 'pprint_repr', lambda: item)() for item in iter(self)])
+	def pprint_repr(self):
+		return self.__pprint_repr()
+	def __repr__(self):
+		return repr(self.__pprint_repr())
+	def __str__(self):
+		return str(self.__pprint_repr())
+
 class SingletonProduction(SequenceProduction):
 	'''Mixin SequenceProduction that cannot deep_contain any instance of its own class'''
 	__slots__= []
@@ -379,7 +415,11 @@ class EmptyProduction(SequenceProduction):
 	   SequenceProduction with a single None containee (so, if that's what you want,
 	   don't use this)"""
 	__slots__ = []
+	def pprint_repr(self):
+		return '<EmptyProduction>'
 	def __repr__(self):
+		return '<EmptyProduction>'
+	def __str__(self):
 		return '<EmptyProduction>'
 	def __contains__(self, item):
 		return False
@@ -391,6 +431,13 @@ class MutableSequenceProduction(SequenceProduction, MutableSequence):
 	'''Mixin Abstract Mutable Sequence Production.  If MutableSequence methods from this
 	   class are called directly or via super() then it will behave as if it is empty/broken'''
 	__slots__ = []
+	def __init__(self, p, **kwargs):
+		if type(self) == MutableSequenceProduction:
+			kwargs['is_error'] = True
+			kwargs['internalize_error'] = False
+			kwargs['error_msg'] = 'Abstract MutableSequenceProduction instantiation'
+			kwargs['error_exception_class'] = RulesParserInternalError
+		super(MutableSequenceProduction, self).__init__(p, **kwargs)
 	def __setitem__(self, index, value):
 		raise IndexError
 	def __delitem__(self, index):
@@ -404,15 +451,12 @@ class MutableSequenceProduction(SequenceProduction, MutableSequence):
 #   __init__:      translate the UserList code to use the standard MixIn patterns
 #                  appropriate in BaseProductions
 #
-#   __repr__:      Offer a distinctly tuple-ish repr with fake [0] items representing
-#                  the attributes of the container
-#
 #   __{,i,r}add__: clone() rather than attempt to unravel the rather complicated
 #                  puzzle of self-constructing ourselves without side-effects
 #                  note that clone() assumes that it is good enough to
 #                  call __new__() (which probably just does object.__new__(self.__class__))
 #                  and assign all the inherited attributes from __slots__.
-class UserListProduction(MutableSequenceProduction):
+class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 	'''Production Mixin analogoue to the UserList class.'''
 	__slots__ = [ 'data' ]
 	def __init__(self, p, user_list_data=None, **kwargs):
@@ -427,19 +471,6 @@ class UserListProduction(MutableSequenceProduction):
 			else:
 				self.data = list(user_list_data)
 		super(UserListProduction, self).__init__(p, **kwargs)
-
-	def prodrepr(self):
-		'''A way to get at the "inherited" (standard) Production __repr__ behavior,
-		   instead of the overridden TupleProduction __repr__ that looks like a tuple'''
-		return super(UserListProduction, self).__repr__()
-
-	def __repr__(self):
-		"""Internal proxy for handling __repr__ of UserListProduction's.  Instead of
-		   displaying the contents directly, they are represented as a tuple with
-		   a 'rogue' first item which exposes information about self, followed
-		   by the remaining items (also as part of the tuple)."""
-		proxytuple = ( self.prodrepr(), ) + tuple(self.data)
-		return proxytuple.__repr__()
 
 	def __lt__(self, other): return self.data < self.__cast(other)
 	def __le__(self, other): return self.data <= self.__cast(other)

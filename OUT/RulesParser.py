@@ -409,7 +409,8 @@ class RulesParser(OOParser):
 
 	def testparse(self, data):
 		r = self.parse(data)
-		pprint (getattr(r, 'pprint_repr'), r)
+		ppr = getattr(r, 'pprint_repr', lambda: r)
+		pprint(ppr(), indent=2, width=60)
 
 # FIXME: move to some kind of documentation or manpage place & correct
 # innacuracies
