@@ -74,7 +74,7 @@ def get_global_rules_filepath():
 class BaseProduction(object):
 	'''Base class for Productions containing mostly Error-Handling glue; accomodating
 	   both instantly-explosive errors and error-delaying modes of operation'''
-	__slots__ = [ 'is_error', 'error_msg', 'error_exception_class', 'p', 'value', 'type' ]
+	__slots__ = [ 'is_error', 'error_msg', 'error_exception_class', 'optimize_again', 'p', 'value', 'type' ]
 	def __init__(self, p, is_error=False, internalize_error=False, error_msg='Unknown Error',
 			error_exception_class=RulesSyntaxError, no_auto_assign=False,
 			value=None, type=None, **kwargs):
@@ -123,8 +123,12 @@ class BaseProduction(object):
 
 		# a hook for subclasses to restructure their productions
 		# using various recipies to simplify the semantic structure without
-		# changing the meaning.
-		self.optimize()
+		# changing the meaning.  Keep optimizing until nobody requrests
+		# reoptimization
+		self.optimize_again = True
+		while self.optimize_again:
+			self.optimize_again = False
+			self.optimize()
 
 		# all initializations, validations and optimizations successful: assign
 		if not no_auto_assign:
@@ -313,7 +317,13 @@ class InternalErrorProduction(ErrorProduction):
 		kwargs['error_exception_class'] = error_exception_class
 		super(InternalErrorProduction, self).__init__(p, **kwargs)
 
-class SequenceProduction(BaseProduction, Sequence):
+# here we aggregate all the MixIn __slots__ variables so that we don't
+# get layout conflicts during Metaclass construction
+class MixInProduction(BaseProduction):
+	__slots__ = [ 'data', 'flatten_sequences_of' ]
+	pass
+
+class SequenceProduction(MixInProduction, Sequence):
 	'''Mixin nestable sequence abstraction for Productions.  If Sequence methods
 	   from this class are called directly or via super() then it will behave as if
 	   it is empty'''
@@ -406,6 +416,7 @@ class SingletonProduction(SequenceProduction):
 			self.error_msg = 'Double Singleton encountered for ' + self.__class__.__name__
 			self.error_exception_class = RulesSyntaxError
 			self.Error()
+		super(SingletonProduction, self).validate()
 
 class EmptyProduction(SequenceProduction):
 	"""Placeholder for empty productions, implemented as a cointainer since typically
@@ -458,7 +469,7 @@ class MutableSequenceProduction(SequenceProduction, MutableSequence):
 #                  and assign all the inherited attributes from __slots__.
 class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 	'''Production Mixin analogoue to the UserList class.'''
-	__slots__ = [ 'data' ]
+	__slots__ = []
 	def __init__(self, p, user_list_data=None, **kwargs):
 		self.data = []
 		if user_list_data != None:
@@ -490,7 +501,7 @@ class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 	def __len__(self): return len(self.data)
 	def __getitem__(self, i): return self.data[i]
 	def __setitem__(self, i, item): self.data[i] = item
-	def __delitem__(self, i, item): del self.data[i]
+	def __delitem__(self, i): del self.data[i]
 	def __getslice__(self, i, j):
 		i = max(i, 0)
 		j = max(j, 0)
@@ -560,24 +571,55 @@ class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 		else:
 			self.data.extend(other)
 
-class SkipsEmptyProduction(MutableSequenceProduction):
+class EmptyIgnoringMutableSequenceProduction(MutableSequenceProduction):
 	'''Mixin SequenceProduction that disappears EmptyProductions in its children'''
 	__slots__ = []
 	def optimize(self):
-		pass
+		itemindexes = []
+		for i in range(0, len(self)):
+			if isinstance(self[i], EmptyProduction):
+				itemindexes.append(i)
+		if len(itemindexes) > 0:
+			self.optimize_again = True
+			itemindexes.reverse()
+			for i in itemindexes:
+				del self[i]
+		super(EmptyIgnoringMutableSequenceProduction, self).optimize()
 
-class AssociativeProduction(MutableSequenceProduction):
-	'''Mixin SequenceProduction that merges containees of the same class as self'''
+# recursively flattens trees of like Productions
+class SequenceFlatteningProduction(MutableSequenceProduction):
+	'''Mixin MutableSequenceProduction that merges trees of containees of the same class as self'''
 	__slots__ = []
+	def __init__(self, p, flatten_sequences_of=None, **kwargs):
+		if flatten_sequences_of is None:
+			kwargs['error_exception_class'] = RulesParserInternalError
+			kwargs['error_msg'] = 'flatten_sequences_of not specified'
+			kwargs['is_error'] = True
+			kwargs['internalize_error'] = False
+		else:
+			self.flatten_sequences_of = flatten_sequences_of
+		super(SequenceFlatteningProduction, self).__init__(p, **kwargs)
 	def optimize(self):
-		pass
+		# go backwards so that indexes don't break while we muck around
+		for i in range(len(self) - 1, -1, -1):
+			if isinstance(self[i], self.flatten_sequences_of):
+				self.optimize_again = True
+				# if we go backwards we have less math to do
+				for i2 in range(len(self[i]) - 1, -1, -1):
+					self.insert(i + 1, self[i][i2])
+				del self[i]
+		super(SequenceFlatteningProduction, self).optimize()
 
 # ------------------------------ here is the semantically interesting stuff ------------------
 
-class StatementsProduction(UserListProduction):
+class StatementsProduction(UserListProduction, SequenceFlatteningProduction, EmptyIgnoringMutableSequenceProduction):
 	__slots__ = []
+	def __init__(self, p, **kwargs):
+		kwargs['flatten_sequences_of'] = StatementsProduction
+		super(StatementsProduction, self).__init__(p, **kwargs)
 	def init_hook(self):
 		self.data = self.p[1:]
+		super(StatementsProduction, self).init_hook()
 
 class RulesProgramProduction(StatementsProduction, SingletonProduction):
 	__slots__ = []
