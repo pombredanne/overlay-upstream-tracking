@@ -239,17 +239,19 @@ class BaseProduction(object):
 			if hasattr(self, '__dict__'):
 				for attr in self.__dict__:
 					if not attr.startswith("__"):
-						rslt.setattr(attr, self.getattr(attr))
+						setattr(rslt, attr, getattr(self, attr, None))
 		else:
 			# presumably they know what they are doing...
 			rslt = subcopy()
 		# subclasses of RulesProductions are required to use __slots__
-		for attr in chain.fromiterable(
+		for attr in set(chain.from_iterable(
 			getattr(cls, '__slots__', [])
 				for cls in type(self).__mro__
 					if issubclass(cls, BaseProduction)
-		):
-			rslt.setattr(attr, self.getattr(attr))
+		)):
+			setattr(rslt, attr, getattr(self, attr, None))
+		return rslt
+
 	def __deepcopy__(self):
 		try:
 			subcopy = super(BaseProduction, self).__deepcopy__
@@ -265,16 +267,17 @@ class BaseProduction(object):
 			if hasattr(self, '__dict__'):
 				for attr in self.__dict__:
 					if not attr.startswith("__"):
-						rslt.setattr(attr, deepcopy(self.getattr(attr)))
+						setattr( rslt, attr,
+							 deepcopy(getattr(self, attr, None)) )
 		else:
 			# assume they know what they're doing
 			rslt = subcopy()
-		for attr in chain.fromiterable(
+		for attr in set(chain.from_iterable(
 			getattr(cls, '__slots__', [])
 				for cls in type(self).__mro__
 					if issubclass(cls, BaseProduction)
-		):
-			itemref = self.getattr(attr)
+		)):
+			itemref = getattr(self, attr, None)
 			if attr == 'p':
 				# presumably the cloning mostly occurs during optimize() when
 				# assignment of p[0] has not yet happened; also, p may contain
@@ -282,12 +285,13 @@ class BaseProduction(object):
 				# a bit much.  It's reasonably safe to assume
 				# nothing horrible will happen if we simply
 				# create a reference to the same p.
-				rslt.setattr('p', itemref)
+				setattr(rslt, attr, itemref)
 			elif isinstance(itemref, type):
 				# cloning class objects seems very extreme :) leave 'em.
-				rslt.setattr(attr, itemref)
+				setattr(rslt, attr, itemref)
 			else:
-				rslt.setattr(attr, deepcopy(itemref))
+				setattr(rslt, attr, deepcopy(itemref))
+		return rslt
 
 class ErrorProduction(BaseProduction):
 	'''Abstract convenience subclass for creating a standard internalized error'''
@@ -462,11 +466,13 @@ class MutableSequenceProduction(SequenceProduction, MutableSequence):
 #   __init__:      translate the UserList code to use the standard MixIn patterns
 #                  appropriate in BaseProductions
 #
-#   __{,i,r}add__: clone() rather than attempt to unravel the rather complicated
+#   __{,i,r}add__: copy() rather than attempt to unravel the rather complicated
 #                  puzzle of self-constructing ourselves without side-effects
 #                  note that clone() assumes that it is good enough to
 #                  call __new__() (which probably just does object.__new__(self.__class__))
 #                  and assign all the inherited attributes from __slots__.
+#
+#  __copy__:	   copy data along with self (as if we were a subclass of data.__class__)
 class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 	'''Production Mixin analogoue to the UserList class.'''
 	__slots__ = []
@@ -482,6 +488,13 @@ class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 			else:
 				self.data = list(user_list_data)
 		super(UserListProduction, self).__init__(p, **kwargs)
+
+	def __copy__(self):
+		# clone data as well, otherwise (rslt.data is self.data)
+		# which is extrememly counterintuitive
+		rslt = super(UserListProduction, self).__copy__()
+		rslt.data = copy(rslt.data)
+		return rslt
 
 	def __lt__(self, other): return self.data < self.__cast(other)
 	def __le__(self, other): return self.data <= self.__cast(other)
