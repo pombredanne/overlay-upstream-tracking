@@ -853,9 +853,10 @@ class AtomicProduction(BaseProduction):
 	   and require_match=True to the constructor, an exception would always be raised,
 	   which is useless.  But if the same constructor arguments were passed but with
 	   require_match set to False, then ID would always be an exact copy of p[1],
-	   which could actually be quite useful.'''
+	   which could actually be quite useful.  By default, require_match is treated
+	   as True.'''
 	__slots__ = ( 'ID', 'require_match', 'type_map', 'value_map' )
-	def __init__(self, p, require_match=False, value_map=(), type_map=(), **kwargs):
+	def __init__(self, p, require_match=True, value_map=(), type_map=(), **kwargs):
 		self.ID = None
 		if not 'value' in kwargs and len(p) > 1 and is_string(p[1]):
 			kwargs['value'] = p[1]
@@ -897,13 +898,17 @@ class AtomicProduction(BaseProduction):
 class NonOptimizingInfixOpProduction(TupleAppearanceProduction, SequenceProduction):
 	'''A very simple production for infix operations with no intrinisic optimizations.
 	   Simply, lvalue will be p[1], op will be p[2], and rvalue will be p[3:].
-	   As a sequence, we look like the tuple ( p[1], ) + p[3:]'''
+	   As a sequence, we look like the tuple ( p[1], ) + p[3:].'''
 	__slots__ = ( 'operator', 'operands' )
-	def init_hook(self):
+	def __init__(self, p, **kwargs):
+		# no reason to wait for init_hook, are good to go.
 		self.operator = p[2]
-		self.operands = ( p[1], ) + p[3:]
+		self.operands = ( p[1], ) + tuple( p[3:] )
+		super(NonOptimizingInfixOpProduction, self).__init__(p, **kwargs)
 	def __getitem__(self, index):
-		return getitem(self.operands, index)
+		return self.operands[index]
+	def __len__(self):
+		return len(self.operands)
 	def _BaseProduction__prod_repr(self):
 		# this is invoked by TupleAppearanceProduction to generate /just/ the 
 		# non-tuple-ish representation part... kinda gross to override it, but w/e

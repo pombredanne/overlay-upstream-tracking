@@ -206,6 +206,10 @@ class RulesProgramProduction(StatementsProduction):
 	__slots__ = ()
 	pass
 
+class AssignmentProduction(NonOptimizingInfixOpProduction):
+	__slots__ = ()
+	pass
+
 # ---------------------- Parser -------------------------
 class RulesParser(OOParser):
 	def __init__(self, lexer=None, **kwargs):
@@ -243,7 +247,7 @@ class RulesParser(OOParser):
 
 	def p_assignment(self, p):
 		'assignment : varname COLONEQUALS value'
-		p[0] = ( 'ASSIGN', p[1], p[3] )
+		AssignmentProduction(p)
 
 	def p_varname(self, p):
 		'varname : ID'
