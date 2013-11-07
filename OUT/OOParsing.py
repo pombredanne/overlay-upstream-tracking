@@ -252,26 +252,25 @@ class BaseProduction(object):
 	'''Base class for Productions containing mostly Error-Handling glue; accomodating
 	   both instantly-explosive errors and error-delaying modes of operation'''
 	__slots__ = ( 'is_error', 'error_msg', 'error_exception_class', 'optimize_again',
-		      'p', 'value', 'type' )
+		      'p', 'value', 'prodtype' )
 	def __init__(self, p, is_error=False, internalize_error=False, error_msg='Unknown Error',
-			error_exception_class=RulesSyntaxError, no_auto_assign=False,
-			value=None, type=None, **kwargs):
+			error_exception_class=RulesSyntaxError, no_auto_assign=False, 
+			value=None, **kwargs):
 		# handle any error
 		self.is_error = is_error
 		self.error_msg = error_msg
 		self.error_exception_class = error_exception_class
 		self.p = p
-		# kinda fuzzy on how this should work, oh well....
-		try:
-			self.value = getattr(p, 'value', getattr(p[0], 'value', None))
-		except:
-			self.value = None
-			pass
-		slice = getattr(p, 'slice', None)
-		if slice:
-			self.type = slice[0]
+		self.value = value
+		if 'prodtype' in kwargs:
+			self.prodtype = kwargs['prodtype']
+			del kwargs['prodtype']
 		else:
-			self.type = None
+			slice = getattr(p, 'slice', None)
+			if slice:
+				self.prodtype = slice[0]
+			else:
+				self.prodtype = None
 		if self.__class__ == BaseProduction:
 			self.error_exception_class = RulesParserInternalError
 			self.error_msg = 'Abstract BaseProduction Instantiated'
@@ -362,8 +361,8 @@ class BaseProduction(object):
 	def __prod_repr(self):
 		if isinstance(self.p, YaccProduction):
 			p_repr = ''
-			if self.type is not None:
-				p_repr += repr(self.type)
+			if self.prodtype is not None:
+				p_repr += repr(self.prodtype)
 			if self.value is not None:
 				p_repr += '/'
 				p_repr += repr(self.value)
@@ -378,9 +377,8 @@ class BaseProduction(object):
 		return self.__prod_repr()
 	def __repr__(self):
 		return self.__prod_repr()
-
 	def __str__(self):
-		return __prod_repr(self)
+		return self.__prod_repr()
 	def __eq__(self, other):
 		if self is other:
 			return True
@@ -398,7 +396,7 @@ class BaseProduction(object):
 				return False
 			elif self.value != other.value:
 				return False
-			elif self.type != other.type:
+			elif self.prodtype != other.prodtype:
 				return False
 			else:
 				return True
@@ -429,7 +427,7 @@ class BaseProduction(object):
 			rslt = subcopy()
 		# subclasses of RulesProductions are required to use __slots__
 		for attr in set(chain.from_iterable(
-			getattr(cls, '__slots__', [])
+			getattr(cls, '__slots__', ())
 				for cls in type(self).__mro__
 					if issubclass(cls, BaseProduction)
 		)):
@@ -457,7 +455,7 @@ class BaseProduction(object):
 			# assume they know what they're doing
 			rslt = subcopy()
 		for attr in set(chain.from_iterable(
-			getattr(cls, '__slots__', [])
+			getattr(cls, '__slots__', ())
 				for cls in type(self).__mro__
 					if issubclass(cls, BaseProduction)
 		)):
@@ -479,7 +477,7 @@ class BaseProduction(object):
 
 class ErrorProduction(BaseProduction):
 	'''Abstract convenience subclass for creating a standard internalized error'''
-	__slots__ = []
+	__slots__ = ()
 	def __init__(self, p, error_msg='Error', internalize_error=False,
 		     error_exception_class=None, **kwargs):
 		kwargs['is_error'] = True
@@ -494,13 +492,13 @@ class ErrorProduction(BaseProduction):
 		super(SyntaxErrorProduction, self).__init__(p, **kwargs)
 
 class SyntaxErrorProduction(ErrorProduction):
-	__slots__ = []
+	__slots__ = ()
 	def __init__(self, p, error_exception_class=RulesSyntaxError, **kwargs):
 		kwargs['error_exception_class'] = error_exception_class
 		super(SyntaxErrorProduction, self).__init__(p, **kwargs)
 
 class InternalErrorProduction(ErrorProduction):
-	__slots__ = []
+	__slots__ = ()
 	def __init__(self, p, error_exception_class=RulesParserInternalError, **kwargs):
 		kwargs['error_exception_class'] = error_exception_class
 		super(InternalErrorProduction, self).__init__(p, **kwargs)
@@ -508,19 +506,19 @@ class InternalErrorProduction(ErrorProduction):
 # here we aggregate all the MixIn __slots__ variables so that we don't
 # get layout conflicts during Metaclass construction.
 class MixInProduction(BaseProduction):
-	__slots__ = [ 'data', 'flatten_sequences_of' ]
+	__slots__ = ( 'data', 'flatten_sequences_of' )
 	pass
 
 class IterableProduction(MixInProduction):
 	'''Mixin abstract Iterable Production.  Mostly identical to collections.Iterable.'''
-	__slots__ = []
+	__slots__ = ()
 	def __iter__(self):
 		while False:
 			yield None
 
 class ProductionIterator(IterableProduction):
 	'''Production Iterator pseudo-mixin.... any need for this?'''
-	__slots__ = []
+	__slots__ = ()
 	def next(self):
 		'Return the next item from the iterator.  When exhausted, raise StopIteration.'
 		raise StopIteration
@@ -529,13 +527,13 @@ class ProductionIterator(IterableProduction):
 
 class SizedProduction(MixInProduction):
 	'''Mixin abstract Sized Production.  Mostly identical to collections.SizedProduction.'''
-	__slots__ = []
+	__slots__ = ()
 	def __len__(self):
 		return 0
 
 class ContainerProduction(MixInProduction):
 	'''Mixin abstract Container Production.  Mostly identical to collections.Container.'''
-	__slots__ = []
+	__slots__ = ()
 	def __contains__(self, x):
 		return False
 
@@ -543,10 +541,15 @@ class SequenceProduction(SizedProduction, IterableProduction, ContainerProductio
 	'''Mixin abstract Sequence Production.  Mostly identical to collections.Sequence.
 	   If Sequence methods from this class are called directly or via super() then it
 	   will behave as if it is empty.  This class is an analogue to python's
-	   collection.Sequence without metaclass baggage.'''
-	__slots__ = []
+	   collection.Sequence without metaclass baggage.  A concrete implementation
+	   must implement at least __getitem__, and preferably __len__ as well, as
+	   the implementation here is very dumb.'''
+	__slots__ = ()
 	def __getitem__(self, index):
 		raise IndexError
+
+	def __len__(self):
+		return len(iter(self))
 
 	def __iter__(self):
 		i = 0
@@ -582,7 +585,7 @@ class SequenceProduction(SizedProduction, IterableProduction, ContainerProductio
 
 class TupleAppearanceProduction(SequenceProduction):
 	'''A Mixin that makes a SequenceProduction look like a tuple'''
-	__slots__  = []
+	__slots__  = ()
 	def __pprint_repr(self):
 		# Get at the "inherited" (standard) Production __repr__ behavior with super()
 		return ( super(TupleAppearanceProduction, self).pprint_repr(), ) + \
@@ -601,7 +604,7 @@ class EmptyProduction(SequenceProduction):
 	   happen in optimize() of containee classes.'  Otherwise, we end up with a
 	   SequenceProduction with a single None containee (so, if that's what you want,
 	   don't use this)"""
-	__slots__ = []
+	__slots__ = ()
 	def pprint_repr(self):
 		return '<EmptyProduction>'
 	def __repr__(self):
@@ -621,7 +624,7 @@ class MutableSequenceProduction(SequenceProduction):
 
 	   Concrete subclasses must provide: __getitem__, __setitem__, __delitem__, __len__,
 	   and insert()'''
-	__slots__ = []
+	__slots__ = ()
 	def __init__(self, p, **kwargs):
 		super(MutableSequenceProduction, self).__init__(p, **kwargs)
 	def __setitem__(self, index, value):
@@ -671,7 +674,7 @@ class MutableSequenceProduction(SequenceProduction):
 #  __copy__:	   copy data along with self (as if we were a subclass of data.__class__)
 class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 	'''Production Mixin analogoue to the UserList class.'''
-	__slots__ = []
+	__slots__ = ()
 	def __init__(self, p, user_list_data=None, **kwargs):
 		self.data = []
 		if user_list_data != None:
@@ -782,7 +785,7 @@ class UserListProduction(MutableSequenceProduction, TupleAppearanceProduction):
 
 class EmptyIgnoringMutableSequenceProduction(MutableSequenceProduction):
 	'''Mixin SequenceProduction that disappears EmptyProductions in its children'''
-	__slots__ = []
+	__slots__ = ()
 	def optimize(self):
 		itemindexes = []
 		for i in range(0, len(self)):
@@ -798,7 +801,7 @@ class EmptyIgnoringMutableSequenceProduction(MutableSequenceProduction):
 # recursively flattens trees of like Productions
 class SequenceFlatteningProduction(MutableSequenceProduction):
 	'''Mixin MutableSequenceProduction that merges trees of containees of the same class as self'''
-	__slots__ = []
+	__slots__ = ()
 	def __init__(self, p, flatten_sequences_of=None, **kwargs):
 		if flatten_sequences_of is None:
 			kwargs['error_exception_class'] = RulesParserInternalError
@@ -831,28 +834,29 @@ class AtomicProduction(BaseProduction):
 	   ID is generated from p[1] according to the following recipe, during the
 	   init_hook phase of __init__.
 
-	   first, by checking the Production's type (if any) for
+	   first, by checking the Production's prodtype (if any) for
 	   a matching key in the type_map, and second, by checking the Production's
 	   value for a matching key in the value_map.  In either case, the value of
 	   ID becomes the corresponding value from the matched item.
 
 	   If no match exists or both mappings are empty, and the Production has a
 	   non-None value attribute, then that is used for the value of ID.  If no match
-	   exists, and value is None, but type is not None, then that is used.
+	   exists, and value is None, but prodtype is not None, then that is used.
 
-	   Finally, if no match exists, value is None, and type is None, then p[1] itself
+	   Finally, if no match exists, value is None, and prodtype is None, then p[1] itself
 	   is used for ID, unless a true value was provided to the require_match keyword
 	   argument of the constructor or require_match has otherwise been set to True.
 
 	   In that case, an exception is raised.  Any of these matching behaviors may be
 	   suppressed by providing corresponding values to the constructor.  So, as a
-	   pathological example, passing value_map=None, type_map=None, value=None, type=None,
+	   pathological example, passing value_map=None, type_map=None, value=None, prodtype=None,
 	   and require_match=True to the constructor, an exception would always be raised,
 	   which is useless.  But if the same constructor arguments were passed but with
 	   require_match set to False, then ID would always be an exact copy of p[1],
 	   which could actually be quite useful.'''
-	__slots__ = [ 'ID', 'require_match', 'type_map', 'value_map' ]
+	__slots__ = ( 'ID', 'require_match', 'type_map', 'value_map' )
 	def __init__(self, p, require_match=False, value_map=(), type_map=(), **kwargs):
+		self.ID = None
 		if not 'value' in kwargs and len(p) > 1 and is_string(p[1]):
 			kwargs['value'] = p[1]
 		self.value_map = value_map
@@ -861,12 +865,51 @@ class AtomicProduction(BaseProduction):
 		super(AtomicProduction, self).__init__(p, **kwargs)
 
 	def init_hook(self):
-		if self.value is not None:
-			self.ID = value
-		elif self.type is not None:
-			self.ID = type
-		elif require_match:
+		if self.value is not None and self.value in self.value_map:
+			self.ID = self.value_map[self.value]
+		elif self.prodtype is not None and self.prodtype in self.type_map:
+			self.ID = self.type_map[self.prodtype]
+		elif self.value is not None:
+			self.ID = self.value
+		elif self.prodtype is not None:
+			self.ID = self.prodtype
+		elif self.require_match:
 			self.error_exception_class = RulesSyntaxError
 			self.error_msg = 'Illegal keyword'
 			self.is_error = True
+		else:
+			self.ID = self.p[1]
 		super(AtomicProduction, self).init_hook()
+	def __prod_repr(self):
+		id_repr = repr(self.ID)
+		if self.is_error:
+			return '<(ERROR: %s: %s) %s: ID=%s>' % (
+				self.error_exception_class, self.error_msg, self.__class__.__name__, id_repr)
+		else:
+			return '<%s: ID=%s>' % (self.__class__.__name__, id_repr)
+	def pprint_repr(self):
+		return self.__prod_repr()
+	def __repr__(self):
+		return self.__prod_repr()
+	def __str__(self):
+		return self.__prod_repr()
+
+class NonOptimizingInfixOpProduction(TupleAppearanceProduction, SequenceProduction):
+	'''A very simple production for infix operations with no intrinisic optimizations.
+	   Simply, lvalue will be p[1], op will be p[2], and rvalue will be p[3:].
+	   As a sequence, we look like the tuple ( p[1], ) + p[3:]'''
+	__slots__ = ( 'operator', 'operands' )
+	def init_hook(self):
+		self.operator = p[2]
+		self.operands = ( p[1], ) + p[3:]
+	def __getitem__(self, index):
+		return getitem(self.operands, index)
+	def _BaseProduction__prod_repr(self):
+		# this is invoked by TupleAppearanceProduction to generate /just/ the 
+		# non-tuple-ish representation part... kinda gross to override it, but w/e
+		op_repr = repr(self.operator)
+		if self.is_error:
+			return '<(ERROR: %s: %s) %s: op=%s>' % (
+				self.error_exception_class, self.error_msg, self.__class__.__name__, op_repr)
+		else:
+			return '<%s: op=%s>' % (self.__class__.__name__, op_repr)

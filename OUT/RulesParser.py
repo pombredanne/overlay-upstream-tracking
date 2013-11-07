@@ -184,7 +184,7 @@ class Luthor(OOLexer):
 # ----------------------- Production Classes for Parser --------------------
 
 class StatementsProduction(UserListProduction, SequenceFlatteningProduction, EmptyIgnoringMutableSequenceProduction):
-	__slots__ = []
+	__slots__ = ()
 	def __init__(self, p, **kwargs):
 		kwargs['flatten_sequences_of'] = StatementsProduction
 		super(StatementsProduction, self).__init__(p, **kwargs)
@@ -192,8 +192,18 @@ class StatementsProduction(UserListProduction, SequenceFlatteningProduction, Emp
 		self.data = self.p[1:]
 		super(StatementsProduction, self).init_hook()
 
+class VariableNameProduction(AtomicProduction):
+	__slots__ = ()
+	def __init__(self, p, **kwargs):
+		kwargs['type_map'] = {}
+		kwargs['value_map'] = {}
+		kwargs['require_match'] = False
+		kwargs['prodtype'] = None
+		kwargs['value'] = None
+		super(VariableNameProduction, self).__init__(p, **kwargs)
+
 class RulesProgramProduction(StatementsProduction):
-	__slots__ = []
+	__slots__ = ()
 	pass
 
 # ---------------------- Parser -------------------------
@@ -232,8 +242,12 @@ class RulesParser(OOParser):
 		p[0] = p[1]
 
 	def p_assignment(self, p):
-		'assignment : ID COLONEQUALS value'
+		'assignment : varname COLONEQUALS value'
 		p[0] = ( 'ASSIGN', p[1], p[3] )
+
+	def p_varname(self, p):
+		'varname : ID'
+		VariableNameProduction(p)
 
 	def p_value(self, p):
 		'value : string'
