@@ -15,9 +15,10 @@
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-from OUT.OOParsing import OOLexer, OOParser
-from OUT.Rules import *
 from pprint import pprint
+from OUT.OOParsing import *
+
+# ------------------------- Lexer --------------------------------
 
 class Luthor(OOLexer):
 	'''NewLexer-based lexer for rules language'''
@@ -180,6 +181,22 @@ class Luthor(OOLexer):
 			if not tok: break
 			print tok
 
+# ----------------------- Production Classes for Parser --------------------
+
+class StatementsProduction(UserListProduction, SequenceFlatteningProduction, EmptyIgnoringMutableSequenceProduction):
+	__slots__ = []
+	def __init__(self, p, **kwargs):
+		kwargs['flatten_sequences_of'] = StatementsProduction
+		super(StatementsProduction, self).__init__(p, **kwargs)
+	def init_hook(self):
+		self.data = self.p[1:]
+		super(StatementsProduction, self).init_hook()
+
+class RulesProgramProduction(StatementsProduction):
+	__slots__ = []
+	pass
+
+# ---------------------- Parser -------------------------
 class RulesParser(OOParser):
 	def __init__(self, lexer=None, **kwargs):
 		if lexer == None:
