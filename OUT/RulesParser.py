@@ -192,16 +192,6 @@ class StatementsProduction(UserListProduction, SequenceFlatteningProduction, Emp
 		self.data = self.p[1:]
 		super(StatementsProduction, self).init_hook()
 
-class VariableNameProduction(AtomicProduction):
-	__slots__ = ()
-	def __init__(self, p, **kwargs):
-		kwargs['type_map'] = {}
-		kwargs['value_map'] = {}
-		kwargs['require_match'] = False
-		kwargs['prodtype'] = None
-		kwargs['value'] = None
-		super(VariableNameProduction, self).__init__(p, **kwargs)
-
 class RulesProgramProduction(StatementsProduction):
 	__slots__ = ()
 	pass
@@ -209,6 +199,46 @@ class RulesProgramProduction(StatementsProduction):
 class AssignmentProduction(NonOptimizingInfixOpProduction):
 	__slots__ = ()
 	pass
+
+class VariableNameProduction(AtomicProduction):
+	__slots__ = ()
+	def __init__(self, p, **kwargs):
+		kwargs['require_match'] = False
+		kwargs['prodtype'] = None
+		kwargs['value'] = None
+		super(VariableNameProduction, self).__init__(p, **kwargs)
+
+class StringChunkProduction(UserListProduction, SequenceFlatteningProduction):
+	__slots__ = ()
+	def __init__(self, p, **kwargs):
+		kwargs['flatten_sequences_of'] = StringChunkProduction
+		super(StringChunkProduction, self).__init__(p, **kwargs)
+
+class StringPartsProduction(StringChunkProduction, EmptyIgnoringMutableSequenceProduction):
+	__slots__ = ()
+	def init_hook(self):
+		self.data = self.p[1:]
+
+class StringProduction(StringChunkProduction):
+	__slots__ = ()
+	def init_hook(self):
+		self.data[:] = self.p[2:-1]
+		super(StringProduction, self).init_hook()
+
+class VariableSubstitutionProduction(AtomicProduction):
+	__slots__ = ()
+	def __init__(self, p, **kwargs):
+		kwargs['prodtype'] = None
+		# ignore the '${' and '}'
+		kwargs['value'] = p[1][2:-1]
+		super(VariableSubstitutionProduction, self).__init__(p, **kwargs)
+
+class StringLiteralProduction(AtomicProduction):
+	__slots__ = ()
+	def __init__(self, p, value=None, **kwargs):
+		a = getattr(p, 'slice', [None,  None])[1]
+		kwargs['prodtype'] = getattr(a, 'type', None)
+		super(StringLiteralProduction, self).__init__(p, **kwargs)
 
 # ---------------------- Parser -------------------------
 class RulesParser(OOParser):
@@ -253,58 +283,46 @@ class RulesParser(OOParser):
 		'varname : ID'
 		VariableNameProduction(p)
 
+	# placeholder until I get around to implementing built-in-functions, then they
+	# go here I think.
 	def p_value(self, p):
 		'value : string'
 		p[0] = p[1]
 
 	def p_string(self, p):
 		'string : OPENQUOTE creamyfilling CLOSEQUOTE'
-		# we could just do p[0] = ( 'STRING', ) + p[2]; however, this will produce
-		# ugly contiguous STRINGLITERAL sub-clauses; detect these and merge them
-		quoteparts = []
-		lastquotepart = [ None ]
-		for quotepart in p[2]:
-			quotepart = list(quotepart)
-			if lastquotepart[0] == 'STRINGLITERAL' and quotepart[0] == 'STRINGLITERAL':
-				lastquotepart[1] += quotepart[1]
-			else:
-				lastquotepart = quotepart
-				quoteparts.append(lastquotepart)
-		p[0] = ( 'STRING', ) + tuple([tuple(i) for i in quoteparts])
+		StringProduction(p)
 
 	def p_creamyfilling(self, p):
 		'''creamyfilling : creamyfilling stringpart
 		                 | empty'''
-		if len(p) == 3:
-			p[0] = p[1] + ( p[2], )
-		else:
-			p[0] = ()
+		StringPartsProduction(p)
 
 	def p_stringpart(self, p):
 		'''stringpart : varsub
 		              | escape
 			      | literal'''
-		p[0] = p[1]
+		StringPartsProduction(p)
 
 	def p_varsub(self, p):
 		'varsub : VARIABLESUBSTITUTION'
-		p[0] = ( 'VARIABLE-SUBSTITUTION', p[1][2:-1] )
+		VariableSubstitutionProduction(p)
 
 	def p_escape(self, p):
 		'''escape : ESCAPEDQUOTE
 		          | ESCAPEDDOLLAR
 			  | ESCAPEDSLASH
 			  | ESCAPEDNEWLINE'''
-		p[0] = ( 'STRINGLITERAL', {
-			'"': '"',
-			'$': '$',
-			'\\': '\\',
-			'n': '\n',
-		}[p[1][1]] )
+		StringLiteralProduction(p, type_map={
+			'ESCAPEDQUOTE': '"',
+			'ESCAPEDDOLLAR': '$',
+			'ESCAPEDSLASH': '\\',
+			'ESCAPEDNEWLINE': '\n'
+		})
 
 	def p_literal(self, p):
 		'literal : STRINGLITERALTEXT'
-		p[0] = ( 'STRINGLITERAL', p[1] )
+		StringLiteralProduction(p, value=p[1])
 
 	def p_ifstmt(self, p):
 		'''ifstmt : IF boolean LCURLY statements RCURLY optionalifclauses'''
@@ -445,7 +463,8 @@ class RulesParser(OOParser):
 	def testparse(self, data):
 		r = self.parse(data)
 		ppr = getattr(r, 'pprint_repr', lambda: r)
-		pprint(ppr(), indent=2, width=60)
+		pprint(ppr(), indent=4, width=60)
+		return r
 
 # FIXME: move to some kind of documentation or manpage place & correct
 # innacuracies

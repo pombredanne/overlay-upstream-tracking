@@ -466,8 +466,8 @@ class BaseProduction(object):
 				# backreferences to the full lexer and parser.  That's
 				# a bit much.  It's reasonably safe to assume
 				# nothing horrible will happen if we simply
-				# create a reference to the same p.
-				setattr(rslt, attr, itemref)
+				# create a shallow copy, however.
+				setattr(rslt, attr, copy(itemref))
 			elif isinstance(itemref, type):
 				# cloning class objects seems very extreme :) leave 'em.
 				setattr(rslt, attr, itemref)
@@ -856,7 +856,7 @@ class AtomicProduction(BaseProduction):
 	   which could actually be quite useful.  By default, require_match is treated
 	   as True.'''
 	__slots__ = ( 'ID', 'require_match', 'type_map', 'value_map' )
-	def __init__(self, p, require_match=True, value_map=(), type_map=(), **kwargs):
+	def __init__(self, p, require_match=True, value_map={}, type_map={}, **kwargs):
 		self.ID = None
 		if not 'value' in kwargs and len(p) > 1 and is_string(p[1]):
 			kwargs['value'] = p[1]
