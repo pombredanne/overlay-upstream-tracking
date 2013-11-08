@@ -287,10 +287,11 @@ class OOParser(object):
 # Since optimization might create opportunities for additional optimization not present before-hand,
 # it is expected that after some changes are made, the MixIn which performed the optimization will
 # set self.optimize_again to True.  In this case, optimize will be invoked once more after the current
-# optimize() invocation has travarsed the __mro__ chain.  One concern here is that optimization might
-# never complete, but instead continuously restart itself in some kind of loop.  No protection against
-# this is taken at the framework level.  If this starts to become a problem then some kind of limit to
-# the number of optimize() invocations could be added.
+# optimize() invocation has travarsed the __mro__ chain.  One concern is that optimization might
+# never complete, but instead continuously restart itself due to a coding error or complex interaction
+# between MixIn optimizations.  To guard against this there is a limit, defaulting to 200, to the number
+# of optimize iterations.  This limit may be modified by setting the max_optimize_cycle_count
+# keyword argument during construction.
 
 class RulesSyntaxError(Exception):
 	'''Thrown if errors are encountered parsing the rules files'''
@@ -305,17 +306,18 @@ class GlobalRulesNotFoundException(Exception):
 class BaseProduction(object):
 	'''Base class for Productions containing mostly Error-Handling glue; accomodating
 	   both instantly-explosive errors and error-delaying modes of operation'''
-	__slots__ = ( 'is_error', 'error_msg', 'error_exception_class', 'optimize_again',
-		      'p', 'value', 'prodtype' )
+	__slots__ = ( 'is_error', 'error_msg', 'error_exception_class', 'max_optimize_cycle_count',
+		      'optimize_again', 'p', 'value', 'prodtype' )
 	def __init__(self, p, is_error=False, internalize_error=False, error_msg='Unknown Error',
 			error_exception_class=RulesSyntaxError, no_auto_assign=False, 
-			value=None, **kwargs):
+			max_optimize_cycle_count=200, value=None, **kwargs):
 		# handle any error
 		self.is_error = is_error
 		self.error_msg = error_msg
 		self.error_exception_class = error_exception_class
 		self.p = p
 		self.value = value
+		self.max_optimize_cycle_count = max_optimize_cycle_count
 		if 'prodtype' in kwargs:
 			self.prodtype = kwargs['prodtype']
 			del kwargs['prodtype']
@@ -361,9 +363,16 @@ class BaseProduction(object):
 		# changing the meaning.  Keep optimizing until nobody requrests
 		# reoptimization
 		self.optimize_again = True
+		optimize_cycle_count = 0
 		while self.optimize_again:
+			if optimize_cycle_count > self.max_optimize_cycle_count:
+				self.error_exception_class = 'RulesParserInternalError'
+				self.error_msg = 'Too many optimization cycles (%s)' % optimize_cycle_count
+				self.is_error = True
+				self.Error()
 			self.optimize_again = False
 			self.optimize()
+			optimize_cycle_count += 1
 			if self.is_error and not internalize_error:
 				self.Error()
 
@@ -854,6 +863,9 @@ class EmptyIgnoringMutableSequenceProduction(MutableSequenceProduction):
 	'''Mixin SequenceProduction that disappears EmptyProductions in its children'''
 	__slots__ = ()
 	def optimize(self):
+		super(EmptyIgnoringMutableSequenceProduction, self).optimize()
+		if self.optimize_again:
+			return
 		itemindexes = []
 		for i in range(0, len(self)):
 			if isinstance(self[i], EmptyProduction):
@@ -863,7 +875,6 @@ class EmptyIgnoringMutableSequenceProduction(MutableSequenceProduction):
 			itemindexes.reverse()
 			for i in itemindexes:
 				del self[i]
-		super(EmptyIgnoringMutableSequenceProduction, self).optimize()
 
 # recursively flattens trees of like Productions
 class SequenceFlatteningProduction(MutableSequenceProduction):
@@ -949,19 +960,7 @@ class AtomicProduction(BaseProduction):
 			self.ID = self.p[1]
 		super(AtomicProduction, self).init_hook()
 	def __prod_repr(self):
-		strselfID = str(self.ID)
-		if "'" in strselfID:
-			if '"' in strselfID:
-				id_repr = repr(self.ID)
-			elif '\n' in strselfID:
-				id_repr = repr(self.ID)
-			else:
-				id_repr = '"' + strselfID + '"'
-		elif '\n' in strselfID:
-			id_repr = repr(self.ID)
-		else:
-			id_repr = "'" + strselfID + "'"
-		id_repr = 'ID=' + id_repr
+		id_repr = 'ID=' + repr(self.ID)
 		if self.prodtype is not None:
 			id_repr = str(self.prodtype) + ': ' + id_repr
 		if self.is_error:
