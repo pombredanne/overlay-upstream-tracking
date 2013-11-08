@@ -213,6 +213,24 @@ class StringChunkProduction(UserListProduction, SequenceFlatteningProduction):
 	def __init__(self, p, **kwargs):
 		kwargs['flatten_sequences_of'] = StringChunkProduction
 		super(StringChunkProduction, self).__init__(p, **kwargs)
+	def optimize(self):
+		# let superclass optimize go first -- we'd rather operate on
+		# the post-processed list: this can save us a pointless re-optimize
+		super(StringChunkProduction, self).optimize()
+		# merge contiguous StringLiteralProductions
+		lastitem = None
+		for index in range(len(self)-1, -1, -1):
+			# only store lastitem if its a StringLiteralProduction (otherwise, zap it)
+			item = self[index]
+			if lastitem is None and isinstance(item, StringLiteralProduction):
+				lastitem = item
+			elif lastitem is not None and isinstance(item, StringLiteralProduction):
+				item.ID += lastitem.ID
+				del self[index + 1]
+				lastitem = item
+				self.optimize_again = True
+			else:
+				lastitem = None
 
 class StringPartsProduction(StringChunkProduction, EmptyIgnoringMutableSequenceProduction):
 	__slots__ = ()
