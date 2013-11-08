@@ -236,7 +236,61 @@ class OOParser(object):
 	def get_precedence(self):
 		return ()
 
-# --------------- Optional RulesProdution convenience class hierarchy ----------
+# --------------- BaseProdution convenience class hierarchy ----------
+
+# These classes may be used to create convenient object-oriented production
+# class hierarchies which may be easily plugged into OOParser methods or
+# traditional module-based yacc parsers.  Aside from a bit of knowledge about
+# the structure of "p", they are not tightly coupled with anything but each other.
+#
+# They all support construction in the form FooProduction(p, [keyword arguments...]),
+# and, unless a true 'no_auto_assign' keyword argument is passed in, they all will
+# immediately replace p[0] with self upon instantiation (or raise an exception).
+#
+# There are, roughly three categories of BaseProduction subclasses; all of them may be
+# subclassed to extend their behavior:
+#
+# o Abstract Interface Productions which act as Mix-Ins.  For example, SequenceProductions
+#   merge equivalent behavior to collections.Sequence into the BaseProduction hierarchy
+# o Concrete "Feature" Productions which serve as the workhorses of the framework:
+#   Key amongst these are the AtomicProduction which serves to replace p[0] with an
+#   atomic (in the sense of not being ContainerProductions) representation of whatever
+#   is in p[1:], and UserListProductons, which transform whatever is in p[1:] into a
+#   list-like structure.
+# o ErrorProductions, which either raise an exception, or, if passed a True internalize_error
+#   keyword argument, store information about parsing errors into p[0].
+#
+# They are designed to be reasonably performant, if not fast.  All subclasses in the framework
+# are expected to implement __slots__ (or otherwise, custom __copy__ and __deepcopy__
+# implementations.  They are built according to a four-phase process:
+#
+# During initialization, keyword arguments are sliced and diced and passed along the MRO
+# chain.  If, by the time this processing reaches BaseProduction (presumably it will be
+# the last BaseProduction in __mro__), any keyword arguments remain unprocessed, an
+# exception is raised.  From BaseProduction.__init__, the remaining three phases are
+# orchestrated:
+#
+# init_hook is invoked and propagated along the __mro__ chain.  This phase is mostly a convenience
+# to allow MixIn classes to initialize themselves.  By separating this from the previous phase,
+# MixIns are freed from having to worry about precisely how the MRO is constructed.  To this end,
+# the convention is that super(<Production Class>, self).__init__(p, **kwargs) will be the last
+# statement in every BaseProduction class's __init__.
+#
+# validate is then invoked and propogated along the __mro__ chain.  The purpose of this is to allow
+# any class in the framework to raise an exception (or, by setting various attributes, to
+# transform self into a pseudo-ErrorProduction), once the initialization phase has fully completed.
+#
+# finally, assuming no error has occured, optimize() is invoked and propogated along the __mro__ chain.
+# This phase is an opportunity for Mix-In classes to transform the arguments into a more efficient or
+# convenient representation.  Presumably, one that is semanticaly equivalent or one which fully or
+# partially carries out the semantic processing which self symbolizes in the language being parsed.
+# Since optimization might create opportunities for additional optimization not present before-hand,
+# it is expected that after some changes are made, the MixIn which performed the optimization will
+# set self.optimize_again to True.  In this case, optimize will be invoked once more after the current
+# optimize() invocation has travarsed the __mro__ chain.  One concern here is that optimization might
+# never complete, but instead continuously restart itself in some kind of loop.  No protection against
+# this is taken at the framework level.  If this starts to become a problem then some kind of limit to
+# the number of optimize() invocations could be added.
 
 class RulesSyntaxError(Exception):
 	'''Thrown if errors are encountered parsing the rules files'''
@@ -362,17 +416,18 @@ class BaseProduction(object):
 		if isinstance(self.p, YaccProduction):
 			p_repr = ''
 			if self.prodtype is not None:
-				p_repr += repr(self.prodtype)
+				p_repr += str(self.prodtype)
 			if self.value is not None:
-				p_repr += '/'
-				p_repr += repr(self.value)
+				p_repr += "/'"
+				p_repr += str(self.value)
+				p_repr += "'"
 		else:
-			p_repr = repr(self.p)
+			p_repr += str(self.p)
 		if self.is_error:
-			return '<(ERROR: %s: %s) %s: p=%s>' % (
+			return '<[ERROR: %s: %s] %s(%s)>' % (
 				self.error_exception_class, self.error_msg, self.__class__.__name__, p_repr)
 		else:
-			return '<%s: p=%s>' % (self.__class__.__name__, p_repr)
+			return '<%s(%s)>' % (self.__class__.__name__, p_repr)
 	def pprint_repr(self):
 		return self.__prod_repr()
 	def __repr__(self):
@@ -583,13 +638,25 @@ class SequenceProduction(SizedProduction, IterableProduction, ContainerProductio
 		'S.count(value) -> integer -- return number of occurences of value'
 		return sum(1 for v in self if v == value)
 
+class TupleAppearanceDummy(object):
+	__slots__ = ( 'reprstr' )
+	def __init__(self, reprstr):
+		self.reprstr = reprstr
+	def __repr__(self):
+		return self.reprstr
+	def __str__(self):
+		return self.reprstr
+
 class TupleAppearanceProduction(SequenceProduction):
 	'''A Mixin that makes a SequenceProduction look like a tuple'''
 	__slots__  = ()
 	def __pprint_repr(self):
-		# Get at the "inherited" (standard) Production __repr__ behavior with super()
-		return ( super(TupleAppearanceProduction, self).pprint_repr(), ) + \
-			 tuple([getattr(item, 'pprint_repr', lambda: item)() for item in iter(self)])
+		# Get at the "inherited" (standard) Production pprint_repr behavior via super, and then
+		# construct a TupleAppearanceDummy object to act as a proxy for it.  This enables it to
+		# act not as a string, but an object, within the tuple, which means it will not
+		# have extra quoting around it in the resulting pprint_repr object.
+		return ( TupleAppearanceDummy(super(TupleAppearanceProduction, self).pprint_repr()), ) + \
+		       tuple([getattr(item, 'pprint_repr', lambda: item)() for item in iter(self)])
 	def pprint_repr(self):
 		return self.__pprint_repr()
 	def __repr__(self):
@@ -882,14 +949,28 @@ class AtomicProduction(BaseProduction):
 			self.ID = self.p[1]
 		super(AtomicProduction, self).init_hook()
 	def __prod_repr(self):
-		id_repr = repr(self.ID)
+		strselfID = str(self.ID)
+		if "'" in strselfID:
+			if '"' in strselfID:
+				id_repr = repr(self.ID)
+			elif '\n' in strselfID:
+				id_repr = repr(self.ID)
+			else:
+				id_repr = '"' + strselfID + '"'
+		elif '\n' in strselfID:
+			id_repr = repr(self.ID)
+		else:
+			id_repr = "'" + strselfID + "'"
+		id_repr = 'ID=' + id_repr
+		if self.prodtype is not None:
+			id_repr = str(self.prodtype) + ': ' + id_repr
 		if self.is_error:
-			return '<(ERROR: %s: %s) %s: ID=%s>' % (
+			return '<(ERROR: %s: %s) %s(%s)>' % (
 				self.error_exception_class, self.error_msg, self.__class__.__name__, id_repr)
 		else:
-			return '<%s: ID=%s>' % (self.__class__.__name__, id_repr)
+			return '<%s(%s)>' % (self.__class__.__name__, id_repr)
 	def pprint_repr(self):
-		return self.__prod_repr()
+		return TupleAppearanceDummy(self.__prod_repr())
 	def __repr__(self):
 		return self.__prod_repr()
 	def __str__(self):
@@ -912,9 +993,11 @@ class NonOptimizingInfixOpProduction(TupleAppearanceProduction, SequenceProducti
 	def _BaseProduction__prod_repr(self):
 		# this is invoked by TupleAppearanceProduction to generate /just/ the 
 		# non-tuple-ish representation part... kinda gross to override it, but w/e
-		op_repr = repr(self.operator)
+		op_repr = 'op=' + repr(self.operator)
+		if self.prodtype is not None:
+			op_repr = str(self.prodtype) + ': ' + op_repr
 		if self.is_error:
-			return '<(ERROR: %s: %s) %s: op=%s>' % (
+			return '<(ERROR: %s: %s) %s(%s)>' % (
 				self.error_exception_class, self.error_msg, self.__class__.__name__, op_repr)
 		else:
-			return '<%s: op=%s>' % (self.__class__.__name__, op_repr)
+			return '<%s(%s)>' % (self.__class__.__name__, op_repr)
